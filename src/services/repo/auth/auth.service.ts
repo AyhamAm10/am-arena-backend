@@ -64,9 +64,7 @@ export class AuthService extends RepoService<User> {
     Ensure.exists(user, "user");
 
     // Verify password
-    if (!user?.password_hash) {
-      throw new Error(ErrorMessages.generateErrorMessage("password", "required", currentLang));
-    }
+    Ensure.exists(user?.password_hash, "password");
 
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {

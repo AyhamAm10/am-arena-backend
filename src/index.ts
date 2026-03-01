@@ -15,6 +15,7 @@ import { langMiddleware } from "./middlewares/lang.middleware";
 import "reflect-metadata";
 import { createSuperAdmin } from "./config/createSuperAdmin";
 import authRouter from "./routes/auth.route";
+import pubgTournamentRouter from "./routes/pubg-tournament.route";
 dotenv.config();
 const app = express();
 
@@ -64,7 +65,8 @@ router.get("/", (req, res) => {
   res.send("Our awesome Web API is online!");
 });
 
-router.use("/auth" , authRouter)
+router.use("/auth", authRouter);
+router.use("/pubg-tournament", pubgTournamentRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 
@@ -101,39 +103,3 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
 }
 
 export { app };
-
-
-// import dotenv from "dotenv";
-// dotenv.config();
-
-// import { app } from "./app";
-// import { AppDataSource } from "./config/data_source";
-// import { logger } from "./logging/logger";
-// import { createSuperAdmin } from "./config/createSuperAdmin";
-// import { Environment } from "./environment";
-
-// const PORT = Number(process.env.PORT) || 5000;
-
-// if (Environment.isDevelopment() || Environment.isProduction()) {
-//   AppDataSource.initialize()
-//     .then(async (connection) => {
-//       logger.info(
-//         `Database connection status: ${
-//           connection.isInitialized ? "Connected" : "Not Connected"
-//         }`
-//       );
-
-//       try {
-//         await createSuperAdmin();
-//       } catch (error) {
-//         logger.error("Failed to create super admin:", error);
-//       }
-
-//       app.listen(PORT, "0.0.0.0", () => {
-//         logger.info(`Server running at http://localhost:${PORT}`);
-//       });
-//     })
-//     .catch((error: Error) => {
-//       logger.error(error);
-//     });
-// }
