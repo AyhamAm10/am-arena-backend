@@ -9,10 +9,11 @@ type CreatePubgRegistrationParams = {
 export class PubgRegistrationService extends RepoService<PubgRegistration> {
   constructor() {
     super(PubgRegistration);
+    this.createPubgRegistration = this.createPubgRegistration.bind(this);
   }
 
-  async create(data: CreatePubgRegistrationParams) {
-    return await super.create({
+  async createPubgRegistration(data: CreatePubgRegistrationParams) {
+    return await this.create({
       tournament: { id: data.tournamentId } as any,
       user: { id: data.userId } as any,
       paid: false,

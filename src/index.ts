@@ -16,6 +16,9 @@ import "reflect-metadata";
 import { createSuperAdmin } from "./config/createSuperAdmin";
 import authRouter from "./routes/auth.route";
 import pubgTournamentRouter from "./routes/pubg-tournament.route";
+import friendRouter from "./routes/friend.route";
+import achievementRouter from "./routes/achievement.route";
+import reelRouter from "./routes/reel.route";
 dotenv.config();
 const app = express();
 
@@ -56,6 +59,7 @@ try {
 
 // app.use("/image", express.static(path.join(process.cwd(), "public/uploads")));
 app.use("/image", express.static(uploadsDir));
+app.use("/icons", express.static(iconsDir));
 app.use(cookieParser());
 // Apply language middleware before routes
 app.use(langMiddleware);
@@ -67,6 +71,9 @@ router.get("/", (req, res) => {
 
 router.use("/auth", authRouter);
 router.use("/pubg-tournament", pubgTournamentRouter);
+router.use("/friend", friendRouter);
+router.use("/achievement", achievementRouter);
+router.use("/reel", reelRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 

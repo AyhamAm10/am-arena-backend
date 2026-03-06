@@ -3,6 +3,7 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { Achievement } from "../entities/Achievement";
 import { Chat } from "../entities/Chat";
+import { ChatMember } from "../entities/ChatMember";
 import { Friend } from "../entities/Friend";
 import { Message } from "../entities/Message";
 import { PubgGame } from "../entities/PubgGame";
@@ -36,6 +37,7 @@ export const AppDataSource = new DataSource({
   entities: [
     Achievement,
     Chat,
+    ChatMember,
     Friend ,
     Message,
     PubgGame,

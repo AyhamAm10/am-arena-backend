@@ -1,5 +1,6 @@
 import { Ensure } from "../../../common/errors/Ensure.handler";
 import { Tournament } from "../../../entities/Tournament";
+import { Chat, ChatType } from "../../../entities/Chat";
 import { RepoService } from "../../repo.service";
 import { CreatePubgTournamentDto } from "../../../dto/pubg-tournament/create-pubg-tournament.dto";
 import { UpdatePubgTournamentDto } from "../../../dto/pubg-tournament/update-pubg-tournament.dto";
@@ -8,6 +9,8 @@ import { PubgService } from "../pubg/pubg.service";
 import { PubgRegistrationFieldService } from "../pubg-registration-field/pubg-registration-field.service";
 import { PubgRegistrationService } from "../pubg-registration/pubg-registration.service";
 import { PubgRegistrationFieldValueService } from "../pubg-registration-field-value/pubg-registration-field-value.service";
+import { ChatService } from "../chat/chat.service";
+import { ChatMemberService } from "../chat-member/chat-member.service";
 
 type CreatePubgTournamentParams = CreatePubgTournamentDto & { createdById: number };
 type UpdatePubgTournamentParams = UpdatePubgTournamentDto;
@@ -65,6 +68,15 @@ export class PubgTournamentService extends RepoService<Tournament> {
         });
       }
     }
+
+    const chatService = new ChatService();
+    await chatService.create({
+      type: ChatType.CHANNEL,
+      title: tournament.title,
+      created_by: { id: params.createdById } as any,
+      tournament: { id: tournament.id } as any,
+      allow_user_messages: true,
+    } as any);
 
     return tournament;
   }
@@ -181,6 +193,12 @@ export class PubgTournamentService extends RepoService<Tournament> {
         value: fv.value,
       });
     }
+
+    const chatService = new ChatService();
+    const chat = await chatService.findByTournamentId(tid);
+    Ensure.exists(chat, "tournament chat");
+    const chatMemberService = new ChatMemberService();
+    await chatMemberService.addMember(chat!.id, userId);
 
     return registration;
   }
