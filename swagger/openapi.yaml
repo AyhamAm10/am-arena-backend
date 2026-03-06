@@ -1,0 +1,413 @@
+openapi: 3.0.0
+info:
+  title: AM Arena Backend API
+  version: 1.0.0
+  description: API documentation for AM Arena Backend. All endpoints follow controller → service → repo pattern. Use Bearer JWT for protected routes.
+
+servers:
+  - url: http://localhost:5000
+    description: Local development
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from login/register (Authorization header)
+
+  schemas:
+    ApiResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          description: Response payload (varies by endpoint)
+        meta:
+          type: object
+          description: Present for paginated responses
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            limit:
+              type: integer
+            totalPages:
+              type: integer
+
+    # Auth schemas
+    AuthRegisterBody:
+      type: object
+      required:
+        - full_name
+        - gamer_name
+        - email
+        - password
+      properties:
+        full_name:
+          type: string
+        gamer_name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        phone:
+          type: string
+        profile_picture_url:
+          type: string
+          format: uri
+
+    AuthLoginBody:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AuthTokensResponse:
+      type: object
+      properties:
+        user:
+          type: object
+        accessToken:
+          type: string
+
+    # Friend schemas
+    SendFriendRequestBody:
+      type: object
+      required:
+        - friend_user_id
+      properties:
+        friend_user_id:
+          type: integer
+          minimum: 1
+
+    AcceptFriendRequestBody:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+
+    GetFriendsQuery:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, accepted, blocked]
+        gamer_name:
+          type: string
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+
+    RemoveFriendshipBody:
+      type: object
+      required:
+        - friend_user_id
+      properties:
+        friend_user_id:
+          type: integer
+          minimum: 1
+
+    # Achievement schemas
+    CreateAchievementBody:
+      type: object
+      required:
+        - name
+        - description
+        - xp_reward
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        color_theme:
+          type: string
+          nullable: true
+        icon_url:
+          type: string
+          nullable: true
+          description: Optional if icon file is uploaded via multipart
+        xp_reward:
+          type: number
+          minimum: 0
+
+    UpdateAchievementBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        color_theme:
+          type: string
+          nullable: true
+        icon_url:
+          type: string
+          nullable: true
+        xp_reward:
+          type: number
+          minimum: 0
+
+    GetAchievementsQuery:
+      type: object
+      properties:
+        name:
+          type: string
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+
+    AssignAchievementBody:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+
+    # Reel schemas
+    CreateReelBody:
+      type: object
+      required:
+        - title
+        - video_url
+        - description
+      properties:
+        title:
+          type: string
+        video_url:
+          type: string
+        description:
+          type: string
+
+    GetReelsQuery:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+
+    AddCommentBody:
+      type: object
+      required:
+        - comment
+      properties:
+        comment:
+          type: string
+
+    GetCommentsQuery:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+
+    # PUBG Tournament schemas
+    PubgGameSchema:
+      type: object
+      required:
+        - type
+        - map
+        - max_players
+        - entry_fee
+        - prize_pool
+      properties:
+        type:
+          type: string
+          enum: [solo, duo, squad]
+        map:
+          type: string
+        max_players:
+          type: integer
+          minimum: 1
+        entry_fee:
+          type: number
+          minimum: 0
+        prize_pool:
+          type: number
+          minimum: 0
+
+    RegistrationFieldSchema:
+      type: object
+      properties:
+        label:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean, select]
+        options:
+          type: string
+          nullable: true
+        required:
+          type: boolean
+          default: true
+
+    CreatePubgTournamentBody:
+      type: object
+      required:
+        - game
+        - title
+        - description
+        - type
+        - entry_fee
+        - prize_pool
+        - max_players
+        - start_date
+        - end_date
+      properties:
+        game:
+          $ref: '#/components/schemas/PubgGameSchema'
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        entry_fee:
+          type: number
+          minimum: 0
+        prize_pool:
+          type: number
+          minimum: 0
+        max_players:
+          type: integer
+          minimum: 1
+        start_date:
+          type: string
+        end_date:
+          type: string
+        is_active:
+          type: boolean
+          default: true
+        registration_fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistrationFieldSchema'
+          default: []
+
+    UpdatePubgTournamentBody:
+      type: object
+      properties:
+        game:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [solo, duo, squad]
+            map:
+              type: string
+            max_players:
+              type: integer
+              minimum: 1
+            entry_fee:
+              type: number
+              minimum: 0
+            prize_pool:
+              type: number
+              minimum: 0
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        entry_fee:
+          type: number
+          minimum: 0
+        prize_pool:
+          type: number
+          minimum: 0
+        max_players:
+          type: integer
+          minimum: 1
+        start_date:
+          type: string
+        end_date:
+          type: string
+        is_active:
+          type: boolean
+        registration_fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistrationFieldSchema'
+
+    GetPubgTournamentsQuery:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+
+    RegisterForTournamentBody:
+      type: object
+      required:
+        - field_values
+      properties:
+        field_values:
+          type: array
+          items:
+            type: object
+            required:
+              - field_id
+              - value
+            properties:
+              field_id:
+                type: integer
+              value:
+                type: string
+
+security: []
+# Per-path security overridden in path files
+
+paths: {}

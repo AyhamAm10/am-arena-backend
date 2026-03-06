@@ -1,0 +1,234 @@
+/achievement:
+  post:
+    tags:
+      - Achievements
+    summary: Create achievement (Admin)
+    description: Creates an achievement. Icon can be uploaded via multipart/form-data (field name icon). Body fields can be sent as form fields.
+    operationId: createAchievement
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required:
+              - name
+              - description
+              - xp_reward
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              color_theme:
+                type: string
+                nullable: true
+              icon:
+                type: string
+                format: binary
+                description: Icon image file
+              xp_reward:
+                type: number
+                minimum: 0
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateAchievementBody'
+    responses:
+      '201':
+        description: Achievement created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '400':
+        description: Validation error or icon required
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (admin only)
+  get:
+    tags:
+      - Achievements
+    summary: Get achievements with filters
+    description: Paginated list with optional name filter.
+    operationId: getAchievements
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: name
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      '200':
+        description: List of achievements
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                    meta:
+                      type: object
+      '401':
+        description: Unauthorized
+
+/achievement/{id}:
+  patch:
+    tags:
+      - Achievements
+    summary: Update achievement (Admin)
+    operationId: updateAchievement
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdateAchievementBody'
+    responses:
+      '200':
+        description: Achievement updated
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '400':
+        description: Validation error
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (admin only)
+      '404':
+        description: Achievement not found
+  delete:
+    tags:
+      - Achievements
+    summary: Delete achievement (Admin)
+    operationId: deleteAchievement
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '200':
+        description: Achievement deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (admin only)
+      '404':
+        description: Achievement not found
+
+/achievement/{id}/assign:
+  post:
+    tags:
+      - Achievements
+    summary: Assign achievement to user (Admin)
+    description: Creates user_achievements record and adds xp_reward to user xp_points.
+    operationId: assignAchievementToUser
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Achievement ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AssignAchievementBody'
+    responses:
+      '201':
+        description: Achievement assigned to user
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '400':
+        description: Validation error or user already has achievement
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (admin only)
+      '404':
+        description: Achievement or user not found

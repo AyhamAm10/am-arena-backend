@@ -1,0 +1,248 @@
+/reel:
+  post:
+    tags:
+      - Reels
+    summary: Create reel
+    description: Creates a reel. Creator is the authenticated user.
+    operationId: createReel
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreateReelBody'
+    responses:
+      '201':
+        description: Reel created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      description: Reel entity
+      '400':
+        description: Validation error
+      '401':
+        description: Unauthorized
+  get:
+    tags:
+      - Reels
+    summary: Get reels
+    description: Paginated list of reels.
+    operationId: getReels
+    security: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      '200':
+        description: List of reels
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                    meta:
+                      type: object
+
+/reel/{id}/comment:
+  post:
+    tags:
+      - Reels
+    summary: Add comment to reel
+    operationId: addComment
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Reel ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddCommentBody'
+    responses:
+      '201':
+        description: Comment added
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '400':
+        description: Validation error or invalid reel id
+      '401':
+        description: Unauthorized
+      '404':
+        description: Reel not found
+
+/reel/{id}/comments:
+  get:
+    tags:
+      - Reels
+    summary: Get reel comments
+    description: Paginated list of comments for a reel.
+    operationId: getReelComments
+    security: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Reel ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      '200':
+        description: List of comments
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                    meta:
+                      type: object
+      '400':
+        description: Invalid reel id
+      '404':
+        description: Reel not found
+
+/reel/{id}/like:
+  post:
+    tags:
+      - Reels
+    summary: Like reel
+    operationId: likeReel
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Reel ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '201':
+        description: Reel liked
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '400':
+        description: Already liked or invalid reel id
+      '401':
+        description: Unauthorized
+      '404':
+        description: Reel not found
+  delete:
+    tags:
+      - Reels
+    summary: Remove like from reel
+    operationId: removeLike
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Reel ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '200':
+        description: Like removed
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Unauthorized
+      '404':
+        description: Like or reel not found

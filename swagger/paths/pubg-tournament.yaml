@@ -1,0 +1,288 @@
+/pubg-tournament:
+  post:
+    tags:
+      - PUBG Tournament
+    summary: Create PUBG tournament (Super Admin)
+    description: Creates game, tournament, registration fields, and tournament channel chat.
+    operationId: createPubgTournament
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreatePubgTournamentBody'
+    responses:
+      '201':
+        description: Tournament created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      description: Tournament entity
+      '400':
+        description: Validation error
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (super_admin only)
+  get:
+    tags:
+      - PUBG Tournament
+    summary: Get PUBG tournaments
+    description: Paginated list of tournaments.
+    operationId: getPubgTournaments
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      '200':
+        description: List of tournaments
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                    meta:
+                      type: object
+      '401':
+        description: Unauthorized
+
+/pubg-tournament/{id}:
+  get:
+    tags:
+      - PUBG Tournament
+    summary: Get tournament by ID
+    operationId: getPubgTournament
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '200':
+        description: Tournament details
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '401':
+        description: Unauthorized
+      '404':
+        description: Tournament not found
+  patch:
+    tags:
+      - PUBG Tournament
+    summary: Update PUBG tournament (Super Admin)
+    operationId: updatePubgTournament
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdatePubgTournamentBody'
+    responses:
+      '200':
+        description: Tournament updated
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (super_admin only)
+      '404':
+        description: Tournament not found
+  delete:
+    tags:
+      - PUBG Tournament
+    summary: Delete PUBG tournament (Super Admin)
+    operationId: deletePubgTournament
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '200':
+        description: Tournament deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (super_admin only)
+      '404':
+        description: Tournament not found
+
+/pubg-tournament/{id}/registration-fields:
+  get:
+    tags:
+      - PUBG Tournament
+    summary: Get registration fields for tournament
+    description: No authentication required.
+    operationId: getRegistrationFields
+    security: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '200':
+        description: List of registration fields
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          label:
+                            type: string
+                          type:
+                            type: string
+                          options:
+                            type: string
+                            nullable: true
+                          required:
+                            type: boolean
+      '404':
+        description: Tournament not found
+
+/pubg-tournament/{id}/register:
+  post:
+    tags:
+      - PUBG Tournament
+    summary: Register for tournament
+    description: Creates pubg_registrations record, field values, and adds user to tournament chat.
+    operationId: registerForTournament
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Tournament ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RegisterForTournamentBody'
+    responses:
+      '201':
+        description: Registration created and user added to tournament chat
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      description: PubgRegistration record
+      '400':
+        description: Validation error or already registered
+      '401':
+        description: Unauthorized
+      '404':
+        description: Tournament not found

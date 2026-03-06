@@ -1,0 +1,172 @@
+/friend/request:
+  post:
+    tags:
+      - Friends
+    summary: Send friend request
+    description: Creates a friend record with status pending.
+    operationId: sendFriendRequest
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SendFriendRequestBody'
+    responses:
+      '201':
+        description: Friend request sent
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      description: Friend record
+      '400':
+        description: Validation error or request already exists
+      '401':
+        description: Unauthorized
+
+/friend/accept:
+  post:
+    tags:
+      - Friends
+    summary: Accept friend request
+    description: Updates status from pending to accepted. Caller is the recipient; body user_id is the requester.
+    operationId: acceptFriendRequest
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AcceptFriendRequestBody'
+    responses:
+      '200':
+        description: Friend request accepted
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+      '401':
+        description: Unauthorized
+      '404':
+        description: Friend request not found
+
+/friend:
+  get:
+    tags:
+      - Friends
+    summary: Get friends list
+    description: Returns friends with optional filters (status, gamer_name) and pagination.
+    operationId: getFriends
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [pending, accepted, blocked]
+      - name: gamer_name
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      '200':
+        description: List of friends
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        type: object
+                    meta:
+                      type: object
+                      properties:
+                        total:
+                          type: integer
+                        page:
+                          type: integer
+                        limit:
+                          type: integer
+                        totalPages:
+                          type: integer
+      '401':
+        description: Unauthorized
+  delete:
+    tags:
+      - Friends
+    summary: Remove friendship
+    description: Deletes the friend record. Only accepted friendships can be removed.
+    operationId: removeFriendship
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RemoveFriendshipBody'
+    responses:
+      '200':
+        description: Friendship removed
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Unauthorized
+      '404':
+        description: Friendship not found
