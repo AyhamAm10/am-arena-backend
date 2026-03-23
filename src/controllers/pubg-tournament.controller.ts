@@ -1,17 +1,12 @@
 /**
- * PUBG tournament creation flow (implement in PubgTournamentService.createPubgTournament):
+ * PUBG tournament creation (PubgTournamentService.createPubgTournament):
  *
  * Admin provides:
- * - PUBG tournament data: title, description, type, entry_fee, prize_pool, max_players, start_date, end_date, created_by
- * - PUBG game data: type (solo/duo/squad), map, max_players, entry_fee, prize_pool
- * - Registration fields required for the tournament: label, type, options, required
+ * - Tournament (Tournament entity): title, description, entry_fee, prize_pool, max_players, start_date, end_date, is_active, created_by
+ * - PUBG game (PubgGame): type (solo/duo/squad), map; image via multipart field `image`
+ * - Registration fields: label, type, options, required
  *
- * Flow steps:
- * 1. Create a pubg_game record first (with the PUBG-specific game data)
- * 2. Create a tournaments record with game_type = 'pubg', game_ref_id = pubg_game.id, and created_by from admin input
- * 3. Create any pubg_registration_fields required for this tournament
- *
- * This ensures that all related tables (pubg_game, tournaments, pubg_registration_fields) are populated and linked correctly.
+ * Flow: create pubg_game → tournament row (game_type = 'pubg', game_ref_id) → registration fields → chat.
  */
 
 import { NextFunction, Request, Response } from "express";
@@ -47,6 +42,7 @@ export class PubgTournamentController {
       await validator(createPubgTournamentSchema, req.body);
       const dto = req.body as CreatePubgTournamentDto;
 
+
       const userId = (req as any).currentUser;
       Ensure.exists(userId, "user");
 
@@ -54,6 +50,7 @@ export class PubgTournamentController {
       const tournament = await pubgTournamentService.createPubgTournament({
         ...dto,
         createdById: userId,
+        image: req.file?.path as string,
       });
 
       return res.status(HttpStatusCode.CREATED).json(
@@ -134,7 +131,7 @@ export class PubgTournamentController {
       const dto = await validator(getPubgTournamentsQuerySchema, req.query) as GetPubgTournamentsQueryDto;
 
       const pubgTournamentService = new PubgTournamentService();
-      const { data, total, page, limit } = await pubgTournamentService.getPubgTournaments(dto);
+      const { data , total, page, limit } = await pubgTournamentService.getPubgTournaments(dto);
 
       return res.json(
         ApiResponse.success(data, ErrorMessages.generateErrorMessage("tournament", "retrieved", lang), {

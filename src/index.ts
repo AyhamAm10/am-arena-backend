@@ -19,6 +19,8 @@ import pubgTournamentRouter from "./routes/pubg-tournament.route";
 import friendRouter from "./routes/friend.route";
 import achievementRouter from "./routes/achievement.route";
 import reelRouter from "./routes/reel.route";
+import userRouter from "./routes/user.route";
+import heroContentRouter from "./routes/hero-content.route";
 dotenv.config();
 const app = express();
 
@@ -74,6 +76,8 @@ router.use("/pubg-tournament", pubgTournamentRouter);
 router.use("/friend", friendRouter);
 router.use("/achievement", achievementRouter);
 router.use("/reel", reelRouter);
+router.use("/user", userRouter);
+router.use("/hero-content", heroContentRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 

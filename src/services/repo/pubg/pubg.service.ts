@@ -3,11 +3,9 @@ import { RepoService } from "../../repo.service";
 import { DeepPartial } from "typeorm";
 
 type CreatePubgGameParams = {
+  image: string;
   type: PubgType | string;
   map: string;
-  max_players: number;
-  entry_fee: number;
-  prize_pool: number;
 };
 
 export class PubgService extends RepoService<PubgGame> {
@@ -19,10 +17,8 @@ export class PubgService extends RepoService<PubgGame> {
     const type = (typeof data.type === "string" ? data.type : data.type) as PubgType;
     return await super.create({
       type,
+      image: data.image,
       map: data.map,
-      max_players: data.max_players,
-      entry_fee: data.entry_fee,
-      prize_pool: data.prize_pool,
     });
   }
 

@@ -1,0 +1,205 @@
+/hero-content:
+  get:
+    tags:
+      - Hero content
+    summary: List hero content
+    description: Paginated list ordered by created_at descending. Public.
+    operationId: getHeroContents
+    security: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      "200":
+        description: Paginated hero content rows
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/HeroContent"
+                    meta:
+                      type: object
+                      properties:
+                        total:
+                          type: integer
+                        page:
+                          type: integer
+                        limit:
+                          type: integer
+                        totalPages:
+                          type: integer
+      "400":
+        description: Validation error
+  post:
+    tags:
+      - Hero content
+    summary: Create hero content (Admin)
+    description: Requires JWT with role admin or super_admin.
+    operationId: createHeroContent
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/CreateHeroContentBody"
+    responses:
+      "201":
+        description: Hero content created
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      $ref: "#/components/schemas/HeroContent"
+      "400":
+        description: Validation error
+      "401":
+        description: Unauthorized
+      "403":
+        description: Forbidden (admin only)
+
+/hero-content/{id}:
+  get:
+    tags:
+      - Hero content
+    summary: Get hero content by ID
+    operationId: getHeroContent
+    security: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Numeric id (heroContentIdParamsSchema)
+        schema:
+          type: string
+          pattern: "^[0-9]+$"
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      "200":
+        description: Hero content row
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      $ref: "#/components/schemas/HeroContent"
+      "400":
+        description: Invalid id
+      "404":
+        description: Not found
+  patch:
+    tags:
+      - Hero content
+    summary: Update hero content (Admin)
+    operationId: updateHeroContent
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[0-9]+$"
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/UpdateHeroContentBody"
+    responses:
+      "200":
+        description: Updated hero content
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      $ref: "#/components/schemas/HeroContent"
+      "400":
+        description: Validation error
+      "401":
+        description: Unauthorized
+      "403":
+        description: Forbidden (admin only)
+      "404":
+        description: Not found
+  delete:
+    tags:
+      - Hero content
+    summary: Delete hero content (Admin)
+    operationId: deleteHeroContent
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: "^[0-9]+$"
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      "200":
+        description: Deleted (empty data object)
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiResponse"
+      "401":
+        description: Unauthorized
+      "403":
+        description: Forbidden (admin only)
+      "404":
+        description: Not found

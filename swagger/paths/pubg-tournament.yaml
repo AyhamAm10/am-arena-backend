@@ -2,8 +2,11 @@
   post:
     tags:
       - PUBG Tournament
-    summary: Create PUBG tournament (Super Admin)
-    description: Creates game, tournament, registration fields, and tournament channel chat.
+    summary: Create PUBG tournament (Super Admin only)
+    description: >
+      multipart/form-data: upload.single("image") for the PUBG game image, plus body fields
+      validated by createPubgTournamentSchema (same shape as CreatePubgTournamentBody, with nested `game`).
+      Creates PubgGame, Tournament (game_type pubg), registration fields, and a tournament channel chat.
     operationId: createPubgTournament
     security:
       - bearerAuth: []
@@ -16,36 +19,35 @@
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
-            $ref: '#/components/schemas/CreatePubgTournamentBody'
+            $ref: "#/components/schemas/CreatePubgTournamentMultipart"
     responses:
-      '201':
+      "201":
         description: Tournament created
         content:
           application/json:
             schema:
               allOf:
-                - $ref: '#/components/schemas/ApiResponse'
+                - $ref: "#/components/schemas/ApiResponse"
                 - type: object
                   properties:
                     data:
                       type: object
                       description: Tournament entity
-      '400':
+      "400":
         description: Validation error
-      '401':
+      "401":
         description: Unauthorized
-      '403':
-        description: Forbidden (super_admin only)
+      "403":
+        description: Forbidden (super_admin role only)
   get:
     tags:
       - PUBG Tournament
     summary: Get PUBG tournaments
-    description: Paginated list of tournaments.
+    description: Paginated list of tournaments. Public (no authentication required).
     operationId: getPubgTournaments
-    security:
-      - bearerAuth: []
+    security: []
     parameters:
       - name: Accept-Language
         in: header
@@ -66,13 +68,13 @@
           maximum: 100
           default: 10
     responses:
-      '200':
+      "200":
         description: List of tournaments
         content:
           application/json:
             schema:
               allOf:
-                - $ref: '#/components/schemas/ApiResponse'
+                - $ref: "#/components/schemas/ApiResponse"
                 - type: object
                   properties:
                     data:
@@ -81,8 +83,6 @@
                         type: object
                     meta:
                       type: object
-      '401':
-        description: Unauthorized
 
 /pubg-tournament/{id}:
   get:
@@ -232,11 +232,18 @@
                             type: string
                           type:
                             type: string
+                            enum: [string, number, boolean, select]
                           options:
                             type: string
                             nullable: true
                           required:
                             type: boolean
+                          created_at:
+                            type: string
+                            format: date-time
+                          updated_at:
+                            type: string
+                            format: date-time
       '404':
         description: Tournament not found
 

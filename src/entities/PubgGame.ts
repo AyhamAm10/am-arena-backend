@@ -16,16 +16,10 @@ export class PubgGame {
   type: PubgType;
 
   @Column()
-  map: string;
-
+  image: string;
+  
   @Column()
-  max_players: number;
-
-  @Column('decimal')
-  entry_fee: number;
-
-  @Column('decimal')
-  prize_pool: number;
+  map: string;
 
   @CreateDateColumn()
   created_at: Date;

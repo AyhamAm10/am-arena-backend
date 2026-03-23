@@ -3,14 +3,17 @@ import { PubgTournamentController } from "../controllers/pubg-tournament.control
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { checkRole } from "../middlewares/role.middleware";
 import { UserRole } from "../entities/User";
+import { upload } from "../middlewares/upload";
 
 const pubgTournamentRouter = Router();
 const pubgTournamentController = new PubgTournamentController();
 
-pubgTournamentRouter.post("/", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), pubgTournamentController.createPubgTournament);
+pubgTournamentRouter.post("/", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), upload.single("image"), pubgTournamentController.createPubgTournament);
 pubgTournamentRouter.patch("/:id", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), pubgTournamentController.updatePubgTournament);
 pubgTournamentRouter.delete("/:id", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), pubgTournamentController.deletePubgTournament);
-pubgTournamentRouter.get("/", authMiddleware, pubgTournamentController.getPubgTournaments);
+pubgTournamentRouter.get("/",
+    //  authMiddleware, 
+     pubgTournamentController.getPubgTournaments);
 pubgTournamentRouter.get("/:id/registration-fields", pubgTournamentController.getRegistrationFields);
 pubgTournamentRouter.post("/:id/register", authMiddleware, pubgTournamentController.registerForTournament);
 pubgTournamentRouter.get("/:id", authMiddleware, pubgTournamentController.getPubgTournament);

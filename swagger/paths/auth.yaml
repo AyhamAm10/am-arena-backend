@@ -3,7 +3,11 @@
     tags:
       - Auth
     summary: Register a new user
-    description: Creates a user account. Optionally accepts multipart for profile_picture_url.
+    description: >
+      Creates a user account. Request body is JSON validated by authRegisterSchema
+      (full_name, gamer_name, email, password required; phone and profile_picture_url optional).
+      Sets refreshToken in an HTTP-only cookie. The controller supports req.file for a profile image
+      only if a multipart upload middleware is attached to the route (current route uses JSON only).
     operationId: register
     security: []
     requestBody:
@@ -32,7 +36,9 @@
     tags:
       - Auth
     summary: Login
-    description: Returns user and accessToken. Sets refreshToken in HTTP-only cookie.
+    description: >
+      Returns user (without password_hash) and accessToken in JSON.
+      Sets refreshToken in an HTTP-only cookie (same cookie options as register).
     operationId: login
     security: []
     requestBody:

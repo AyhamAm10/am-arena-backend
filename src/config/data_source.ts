@@ -5,6 +5,7 @@ import { Achievement } from "../entities/Achievement";
 import { Chat } from "../entities/Chat";
 import { ChatMember } from "../entities/ChatMember";
 import { Friend } from "../entities/Friend";
+import { HeroContent } from "../entities/HeroContent";
 import { Message } from "../entities/Message";
 import { PubgGame } from "../entities/PubgGame";
 import { PubgRegistration } from "../entities/PubgRegistration";
@@ -38,7 +39,8 @@ export const AppDataSource = new DataSource({
     Achievement,
     Chat,
     ChatMember,
-    Friend ,
+    Friend,
+    HeroContent,
     Message,
     PubgGame,
     PubgRegistration,

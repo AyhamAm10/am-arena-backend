@@ -6,7 +6,23 @@ info:
 
 servers:
   - url: http://localhost:5000
-    description: Local development
+    description: Local development (prefix routes with BASE_URL if set, e.g. /)
+
+tags:
+  - name: Auth
+    description: Registration, login, session, current user
+  - name: Friends
+    description: Friend requests and friendships
+  - name: Achievements
+    description: Achievement definitions and admin assignment
+  - name: Reels
+    description: Reels, comments, likes
+  - name: PUBG Tournament
+    description: PUBG tournaments, registration fields, signup
+  - name: User
+    description: Leaderboard and public profiles
+  - name: Hero content
+    description: CMS-style hero slides (admin mutations, public reads)
 
 components:
   securitySchemes:
@@ -64,9 +80,11 @@ components:
           minLength: 6
         phone:
           type: string
+          description: Optional; validated when provided
         profile_picture_url:
           type: string
           format: uri
+          description: Optional URL (yup url validation)
 
     AuthLoginBody:
       type: object
@@ -247,33 +265,33 @@ components:
           maximum: 100
           default: 10
 
-    # PUBG Tournament schemas
-    PubgGameSchema:
+    # PUBG Tournament schemas (matches create-pubg-tournament.dto / update-pubg-tournament.dto)
+    PubgGameCreate:
       type: object
       required:
         - type
         - map
-        - max_players
-        - entry_fee
-        - prize_pool
       properties:
         type:
           type: string
           enum: [solo, duo, squad]
         map:
           type: string
-        max_players:
-          type: integer
-          minimum: 1
-        entry_fee:
-          type: number
-          minimum: 0
-        prize_pool:
-          type: number
-          minimum: 0
+
+    PubgGameUpdate:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [solo, duo, squad]
+        map:
+          type: string
 
     RegistrationFieldSchema:
       type: object
+      required:
+        - label
+        - type
       properties:
         label:
           type: string
@@ -287,26 +305,42 @@ components:
           type: boolean
           default: true
 
-    CreatePubgTournamentBody:
+    RegistrationFieldUpdateSchema:
       type: object
+      properties:
+        label:
+          type: string
+        type:
+          type: string
+          enum: [string, number, boolean, select]
+        options:
+          type: string
+          nullable: true
+        required:
+          type: boolean
+
+    CreatePubgTournamentMultipart:
+      type: object
+      description: >
+        Matches POST /pubg-tournament with multipart (upload.single("image")).
+        Field `game` is the nested object from createPubgTournamentSchema.game.
+        Numeric fields may arrive as strings from multipart and are coerced by validation.
       required:
-        - game
+        - image
         - title
         - description
-        - type
         - entry_fee
         - prize_pool
         - max_players
-        - start_date
-        - end_date
+        - game
       properties:
-        game:
-          $ref: '#/components/schemas/PubgGameSchema'
+        image:
+          type: string
+          format: binary
+          description: Game image file (stored for PubgGame.image)
         title:
           type: string
         description:
-          type: string
-        type:
           type: string
         entry_fee:
           type: number
@@ -319,42 +353,73 @@ components:
           minimum: 1
         start_date:
           type: string
+          nullable: true
+          description: Optional ISO date string; stored as tournament start_date
         end_date:
           type: string
+          nullable: true
+        is_active:
+          type: boolean
+          default: true
+        game:
+          $ref: "#/components/schemas/PubgGameCreate"
+        registration_fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistrationFieldSchema"
+          default: []
+
+    CreatePubgTournamentBody:
+      description: >
+        Same logical shape as JSON body validated by createPubgTournamentSchema (used when documenting request shape).
+        Live create endpoint uses multipart/form-data with binary `image` — see CreatePubgTournamentMultipart.
+      type: object
+      required:
+        - game
+        - title
+        - description
+        - entry_fee
+        - prize_pool
+        - max_players
+      properties:
+        game:
+          $ref: "#/components/schemas/PubgGameCreate"
+        title:
+          type: string
+        description:
+          type: string
+        entry_fee:
+          type: number
+          minimum: 0
+        prize_pool:
+          type: number
+          minimum: 0
+        max_players:
+          type: integer
+          minimum: 1
+        start_date:
+          type: string
+          nullable: true
+        end_date:
+          type: string
+          nullable: true
         is_active:
           type: boolean
           default: true
         registration_fields:
           type: array
           items:
-            $ref: '#/components/schemas/RegistrationFieldSchema'
+            $ref: "#/components/schemas/RegistrationFieldSchema"
           default: []
 
     UpdatePubgTournamentBody:
       type: object
       properties:
         game:
-          type: object
-          properties:
-            type:
-              type: string
-              enum: [solo, duo, squad]
-            map:
-              type: string
-            max_players:
-              type: integer
-              minimum: 1
-            entry_fee:
-              type: number
-              minimum: 0
-            prize_pool:
-              type: number
-              minimum: 0
+          $ref: "#/components/schemas/PubgGameUpdate"
         title:
           type: string
         description:
-          type: string
-        type:
           type: string
         entry_fee:
           type: number
@@ -374,7 +439,7 @@ components:
         registration_fields:
           type: array
           items:
-            $ref: '#/components/schemas/RegistrationFieldSchema'
+            $ref: "#/components/schemas/RegistrationFieldUpdateSchema"
 
     GetPubgTournamentsQuery:
       type: object
@@ -396,6 +461,7 @@ components:
       properties:
         field_values:
           type: array
+          description: Required array (may be empty if no registration fields)
           items:
             type: object
             required:
@@ -406,6 +472,203 @@ components:
                 type: integer
               value:
                 type: string
+
+    UserRole:
+      type: string
+      enum: [user, admin, super_admin]
+      description: Matches UserRole in entities/User.ts
+
+    UserPublicSummary:
+      type: object
+      description: Fields returned by GET /user/best (password_hash, email, phone omitted)
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        gamer_name:
+          type: string
+        profile_picture_url:
+          type: string
+          nullable: true
+        xp_points:
+          type: integer
+        coins:
+          description: Stored as decimal in DB; may serialize as string in JSON
+          oneOf:
+            - type: number
+            - type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AchievementPublic:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        color_theme:
+          type: string
+          nullable: true
+        icon_url:
+          type: string
+        xp_reward:
+          type: integer
+
+    UserAchievementEntry:
+      type: object
+      properties:
+        obtained_at:
+          type: string
+          format: date-time
+        achievement:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/AchievementPublic"
+
+    TournamentSummary:
+      type: object
+      description: Tournament entity as returned in user profile won_tournaments (relations may vary)
+      properties:
+        id:
+          type: integer
+        game_type:
+          type: string
+        game_ref_id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        entry_fee:
+          oneOf:
+            - type: number
+            - type: string
+        prize_pool:
+          oneOf:
+            - type: number
+            - type: string
+        max_players:
+          type: integer
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserProfilePublic:
+      type: object
+      description: Public user block in GET /user/:id/profile (no email, phone, password)
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        gamer_name:
+          type: string
+        profile_picture_url:
+          type: string
+          nullable: true
+        xp_points:
+          type: integer
+        coins:
+          oneOf:
+            - type: number
+            - type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    UserProfileResponse:
+      type: object
+      required:
+        - user
+        - achievements
+        - won_tournaments
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfilePublic"
+        achievements:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserAchievementEntry"
+        won_tournaments:
+          type: array
+          description: Up to 10 items, sorted by tournament updated_at descending
+          items:
+            $ref: "#/components/schemas/TournamentSummary"
+
+    HeroContent:
+      type: object
+      properties:
+        id:
+          type: integer
+        image:
+          type: string
+          description: Image URL or path string
+        title:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateHeroContentBody:
+      type: object
+      required:
+        - image
+        - title
+        - description
+      properties:
+        image:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+
+    UpdateHeroContentBody:
+      type: object
+      properties:
+        image:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
 
 security: []
 # Per-path security overridden in path files

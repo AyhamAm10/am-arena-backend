@@ -6,9 +6,6 @@ const registrationFieldTypeEnum = ["string", "number", "boolean", "select"] as c
 const gameSchema = yup.object({
   type: yup.string().oneOf(pubgTypeEnum).required("Game type is required"),
   map: yup.string().required("Map is required"),
-  max_players: yup.number().min(1).required("Max players is required"),
-  entry_fee: yup.number().min(0).required("Entry fee is required"),
-  prize_pool: yup.number().min(0).required("Prize pool is required"),
 });
 
 const registrationFieldSchema = yup.object({
@@ -22,12 +19,11 @@ export const createPubgTournamentSchema = yup.object({
   game: gameSchema.required("Game data is required"),
   title: yup.string().required("Title is required"),
   description: yup.string().required("Description is required"),
-  type: yup.string().required("Tournament type is required"),
   entry_fee: yup.number().min(0).required("Entry fee is required"),
   prize_pool: yup.number().min(0).required("Prize pool is required"),
   max_players: yup.number().min(1).required("Max players is required"),
-  start_date: yup.string().required("Start date is required"),
-  end_date: yup.string().required("End date is required"),
+  start_date: yup.string().optional().nullable(),
+  end_date: yup.string().optional().nullable(),
   is_active: yup.boolean().optional().default(true),
   registration_fields: yup.array().of(registrationFieldSchema).optional().default([]),
 });

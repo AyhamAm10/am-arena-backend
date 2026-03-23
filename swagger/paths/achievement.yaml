@@ -31,10 +31,14 @@
               color_theme:
                 type: string
                 nullable: true
+              icon_url:
+                type: string
+                nullable: true
+                description: Optional when uploading file via icon
               icon:
                 type: string
                 format: binary
-                description: Icon image file
+                description: Icon image file (optional if icon_url provided; controller requires one of icon or icon_url)
               xp_reward:
                 type: number
                 minimum: 0

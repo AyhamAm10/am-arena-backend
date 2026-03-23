@@ -11,8 +11,7 @@ import { PubgRegistrationService } from "../pubg-registration/pubg-registration.
 import { PubgRegistrationFieldValueService } from "../pubg-registration-field-value/pubg-registration-field-value.service";
 import { ChatService } from "../chat/chat.service";
 import { ChatMemberService } from "../chat-member/chat-member.service";
-
-type CreatePubgTournamentParams = CreatePubgTournamentDto & { createdById: number };
+type CreatePubgTournamentParams = CreatePubgTournamentDto & { createdById: number; image: string };
 type UpdatePubgTournamentParams = UpdatePubgTournamentDto;
 
 export class PubgTournamentService extends RepoService<Tournament> {
@@ -33,11 +32,9 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
     const pubgService = new PubgService();
     const game = await pubgService.createPubgGame({
+      image: params.image,
       type: params.game.type,
       map: params.game.map,
-      max_players: params.game.max_players,
-      entry_fee: params.game.entry_fee,
-      prize_pool: params.game.prize_pool,
     });
 
     const tournament = await this.create({
@@ -45,12 +42,11 @@ export class PubgTournamentService extends RepoService<Tournament> {
       game_ref_id: game.id,
       title: params.title,
       description: params.description,
-      type: params.type,
       entry_fee: params.entry_fee,
       prize_pool: params.prize_pool,
       max_players: params.max_players,
-      start_date: new Date(params.start_date),
-      end_date: new Date(params.end_date),
+      start_date: params.start_date ? new Date(params.start_date) : null,
+      end_date: params.end_date ? new Date(params.end_date) : null,
       is_active: params.is_active ?? true,
       created_by: { id: params.createdById } as any,
     });
@@ -87,19 +83,15 @@ export class PubgTournamentService extends RepoService<Tournament> {
     const pubgRegistrationFieldService = new PubgRegistrationFieldService();
 
     if (params.game !== undefined && Object.keys(params.game).length > 0) {
-      const gameData: any = {};
+      const gameData: Record<string, unknown> = {};
       if (params.game.type !== undefined) gameData.type = params.game.type;
       if (params.game.map !== undefined) gameData.map = params.game.map;
-      if (params.game.max_players !== undefined) gameData.max_players = params.game.max_players;
-      if (params.game.entry_fee !== undefined) gameData.entry_fee = params.game.entry_fee;
-      if (params.game.prize_pool !== undefined) gameData.prize_pool = params.game.prize_pool;
       await pubgService.update(tournament.game_ref_id, gameData);
     }
 
     const data: any = {};
     if (params.title !== undefined) data.title = params.title;
     if (params.description !== undefined) data.description = params.description;
-    if (params.type !== undefined) data.type = params.type;
     if (params.entry_fee !== undefined) data.entry_fee = params.entry_fee;
     if (params.prize_pool !== undefined) data.prize_pool = params.prize_pool;
     if (params.max_players !== undefined) data.max_players = params.max_players;
@@ -140,12 +132,38 @@ export class PubgTournamentService extends RepoService<Tournament> {
   }
 
   async getPubgTournament(id: string | number) {
-    return await this.getById(id);
+    const tournament = await this.getById(id) as Tournament;
+
+    const pubgService = new PubgService();
+    const game = await pubgService.getById(tournament.game_ref_id);
+
+    const registrationFields = await this.getRegistrationFields(tournament.id);
+    return {
+      ...tournament,
+      game,
+      registration_fields: registrationFields,
+    };
   }
 
   async getPubgTournaments(options: GetPubgTournamentsQueryDto) {
     const { page = 1, limit = 10 } = options;
-    return await this.getAllWithPagination({ page, limit });
+    const data = await this.getAllWithPagination({ page, limit });
+
+    const pubgService = new PubgService();
+
+    data.data = await Promise.all(
+      data.data.map(async (tournament: Tournament) => {
+        const game = await pubgService.getById(tournament.game_ref_id);
+        const registrationFields = await this.getRegistrationFields(tournament.id);
+        return {
+          ...tournament,
+          registration_fields: registrationFields,
+          game,
+        };
+      })
+    );
+
+    return data;
   }
 
   async getRegistrationFields(tournamentId: string | number) {
@@ -202,4 +220,5 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
     return registration;
   }
+
 }

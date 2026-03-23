@@ -1,5 +1,5 @@
 // src/entities/User.ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany } from 'typeorm';
 
 import { Message } from './Message';
 import { Chat } from './Chat';
@@ -78,4 +78,7 @@ export class User {
 
   @OneToMany(() => UserAchievement, (ua) => ua.user)
   achievements: UserAchievement[];
+
+  @ManyToMany(() => Tournament, (tournament) => tournament.winners)
+  wonTournaments: Tournament[];
 }

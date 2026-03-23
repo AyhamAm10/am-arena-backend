@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryColumn, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryColumn, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
 import { User } from './User';
 
 export enum FriendStatus {
@@ -16,10 +16,13 @@ export class Friend {
   friend_user_id: number;
 
   @ManyToOne(() => User, (user) => user.friends)
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @ManyToOne(() => User)
+  @JoinColumn({ name: 'friend_user_id' })
   friend: User;
+
 
   @Column({ type: 'enum', enum: FriendStatus, default: FriendStatus.PENDING })
   status: FriendStatus;

@@ -1,5 +1,5 @@
 // src/entities/Tournament.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinTable, ManyToMany } from 'typeorm';
 import { User } from './User';
 
 @Entity('tournaments')
@@ -19,8 +19,6 @@ export class Tournament {
   @Column('text')
   description: string;
 
-  @Column()
-  type: string;
 
   @Column('decimal')
   entry_fee: number;
@@ -31,11 +29,11 @@ export class Tournament {
   @Column()
   max_players: number;
 
-  @Column()
-  start_date: Date;
+  @Column({ nullable: true })
+  start_date: Date | null;
 
-  @Column()
-  end_date: Date;
+  @Column({ nullable: true })
+  end_date: Date | null;
 
   @ManyToOne(() => User, (user) => user.created_tournaments)
   created_by: User;
@@ -48,4 +46,13 @@ export class Tournament {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @ManyToMany(() => User)
+  @JoinTable({
+    name: 'tournament_winners', 
+    joinColumn: { name: 'tournament_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'user_id', referencedColumnName: 'id' },
+  })
+  winners: User[];
+
 }

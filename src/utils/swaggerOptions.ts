@@ -6,7 +6,15 @@ import yaml from "js-yaml";
 
 const SWAGGER_DIR = path.resolve(process.cwd(), "swagger");
 const PATHS_DIR = path.join(SWAGGER_DIR, "paths");
-const PATH_FILES = ["auth", "friend", "achievement", "reel", "pubg-tournament"];
+const PATH_FILES = [
+  "auth",
+  "friend",
+  "achievement",
+  "reel",
+  "pubg-tournament",
+  "user",
+  "hero-content",
+];
 
 function loadSwaggerSpec(): object {
   const openapiPath = path.join(SWAGGER_DIR, "openapi.yaml");

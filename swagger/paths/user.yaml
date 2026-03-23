@@ -1,0 +1,96 @@
+/user/best:
+  get:
+    tags:
+      - User
+    summary: Get top users by XP
+    description: Returns users sorted by xp_points descending. Public; no authentication.
+    operationId: getBestUsers
+    security: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+      - name: page
+        in: query
+        description: Page number (default 1)
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: limit
+        in: query
+        description: Page size (default 10, max 100)
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+    responses:
+      "200":
+        description: Paginated list of users (password and other sensitive fields omitted)
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      type: array
+                      items:
+                        $ref: "#/components/schemas/UserPublicSummary"
+                    meta:
+                      type: object
+                      properties:
+                        total:
+                          type: integer
+                        page:
+                          type: integer
+                        limit:
+                          type: integer
+                        totalPages:
+                          type: integer
+      "400":
+        description: Validation error
+
+/user/{id}/profile:
+  get:
+    tags:
+      - User
+    summary: Get user profile
+    description: >
+      Public profile with basic user fields (no email/phone/password), assigned achievements with
+      achievement details, and up to 10 most recently updated won tournaments.
+    operationId: getUserProfile
+    security: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: User ID (digits only; validated by getUserProfileParamsSchema)
+        schema:
+          type: string
+          pattern: "^[0-9]+$"
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      "200":
+        description: User profile payload
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ApiResponse"
+                - type: object
+                  properties:
+                    data:
+                      $ref: "#/components/schemas/UserProfileResponse"
+      "400":
+        description: Invalid user id
+      "404":
+        description: User not found

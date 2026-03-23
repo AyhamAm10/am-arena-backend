@@ -26,7 +26,7 @@ export class Chat {
   @ManyToOne(() => User, (user) => user.chats_created)
   created_by: User;
 
-  @ManyToOne(() => Tournament, { nullable: true })
+  @ManyToOne(() => Tournament, { nullable: true , onDelete: 'SET NULL' })
   @JoinColumn({ name: 'tournament_id' })
   tournament: Tournament;
 
