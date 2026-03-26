@@ -178,7 +178,8 @@ export class PubgTournamentController {
       const registration = await pubgTournamentService.registerForTournament(
         tournamentId,
         userId,
-        dto.field_values as { field_id: number; value: string }[]
+        dto.field_values as { field_id: number; value: string }[],
+        dto.friends as number[] | undefined
       );
 
       return res.status(HttpStatusCode.CREATED).json(

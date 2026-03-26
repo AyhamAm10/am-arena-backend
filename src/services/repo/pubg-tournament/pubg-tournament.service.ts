@@ -11,6 +11,9 @@ import { PubgRegistrationService } from "../pubg-registration/pubg-registration.
 import { PubgRegistrationFieldValueService } from "../pubg-registration-field-value/pubg-registration-field-value.service";
 import { ChatService } from "../chat/chat.service";
 import { ChatMemberService } from "../chat-member/chat-member.service";
+import { UserService } from "../user/user.service";
+import { PubgType } from "../../../entities/PubgGame";
+import { In } from "typeorm";
 type CreatePubgTournamentParams = CreatePubgTournamentDto & { createdById: number; image: string };
 type UpdatePubgTournamentParams = UpdatePubgTournamentDto;
 
@@ -184,13 +187,16 @@ export class PubgTournamentService extends RepoService<Tournament> {
   async registerForTournament(
     tournamentId: string | number,
     userId: number,
-    fieldValues: { field_id: number; value: string }[]
+    fieldValues: { field_id: number; value: string }[],
+    friends?: number[]
   ) {
     const tournament = await this.getById(tournamentId) as Tournament;
     const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
     const pubgRegistrationFieldService = new PubgRegistrationFieldService();
     const pubgRegistrationService = new PubgRegistrationService();
     const pubgRegistrationFieldValueService = new PubgRegistrationFieldValueService();
+    const pubgService = new PubgService();
+    const userService = new UserService();
 
     const fields = await pubgRegistrationFieldService.findByTournamentId(tid);
     const requiredFields = fields.filter((f) => f.required);
@@ -202,7 +208,30 @@ export class PubgTournamentService extends RepoService<Tournament> {
     const existing = await pubgRegistrationService.findByTournamentAndUser(tid, userId);
     Ensure.custom(!existing, "You are already registered for this tournament");
 
-    const registration = await pubgRegistrationService.createPubgRegistration({ tournamentId: tid, userId });
+    const game = await pubgService.getById(tournament.game_ref_id);
+    Ensure.exists(game, "pubg game");
+
+    // Solo registrations should ignore friends even if provided.
+    let validFriendIds: number[] = [];
+    if (game.type !== PubgType.SOLO) {
+      const friendIds = Array.from(new Set((friends ?? []).filter((id) => id !== userId)));
+      if (friendIds.length > 0) {
+        const existingFriends = await userService.findManyByCondition({
+          id: In(friendIds),
+        } as any);
+        Ensure.custom(
+          existingFriends.length === friendIds.length,
+          "One or more friends were not found"
+        );
+        validFriendIds = friendIds;
+      }
+    }
+
+    const registration = await pubgRegistrationService.createPubgRegistration({
+      tournamentId: tid,
+      userId,
+      friends: validFriendIds,
+    });
 
     for (const fv of fieldValues) {
       await pubgRegistrationFieldValueService.create({

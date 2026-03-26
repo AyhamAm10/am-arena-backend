@@ -4,6 +4,7 @@ import { RepoService } from "../../repo.service";
 type CreatePubgRegistrationParams = {
   tournamentId: number;
   userId: number;
+  friends?: number[];
 };
 
 export class PubgRegistrationService extends RepoService<PubgRegistration> {
@@ -16,6 +17,7 @@ export class PubgRegistrationService extends RepoService<PubgRegistration> {
     return await this.create({
       tournament: { id: data.tournamentId } as any,
       user: { id: data.userId } as any,
+      friends: (data.friends ?? []).map((id) => ({ id })) as any,
       paid: false,
       registered_at: new Date(),
     });

@@ -7,6 +7,11 @@ const fieldValueSchema = yup.object({
 
 export const registerForTournamentSchema = yup.object({
   field_values: yup.array().of(fieldValueSchema).required("Field values are required"),
+  friends: yup
+    .array()
+    .of(yup.number().integer().min(1))
+    .optional()
+    .default([]),
 });
 
 export type RegisterForTournamentDto = yup.InferType<typeof registerForTournamentSchema>;

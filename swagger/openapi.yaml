@@ -105,6 +105,22 @@ components:
           type: object
         accessToken:
           type: string
+        refreshToken:
+          type: string
+          description: Also set as httpOnly cookie; included in JSON for native clients
+
+    AuthRefreshBody:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: Optional when refreshToken httpOnly cookie is sent (e.g. web with credentials)
+
+    AuthRefreshResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
 
     # Friend schemas
     SendFriendRequestBody:

@@ -1,4 +1,4 @@
-import { sign, verify, type SignOptions, type Secret } from 'jsonwebtoken';
+import jwt, { sign, verify, type SignOptions, type Secret } from 'jsonwebtoken';
 
 export interface TokenPayload {
   userId: number;
@@ -51,8 +51,11 @@ export class JwtService {
   static verifyAccessToken(token: string): TokenPayload {
     try {
       return verify(token, this.ACCESS_SECRET) as TokenPayload;
-    } catch {
-      throw new Error('Invalid or expired access token');
+    } catch (e) {
+      if (e instanceof jwt.TokenExpiredError) {
+        throw e;
+      }
+      throw new jwt.JsonWebTokenError("Invalid access token");
     }
   }
 

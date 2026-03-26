@@ -3,6 +3,7 @@ import { HeroContentController } from "../controllers/hero-content.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { checkRole } from "../middlewares/role.middleware";
 import { UserRole } from "../entities/User";
+import { upload } from "../middlewares/upload";
 
 const heroContentRouter = Router();
 const heroContentController = new HeroContentController();
@@ -14,6 +15,7 @@ heroContentRouter.post(
   "/",
   authMiddleware,
   checkRole(adminRole),
+  upload.single("image"),
   heroContentController.createHeroContent
 );
 heroContentRouter.patch(

@@ -2,7 +2,7 @@ import { Ensure } from "../../../common/errors/Ensure.handler";
 
 import { User } from "../../../entities/User";
 import { RepoService } from "../../repo.service";
-import { JwtService } from "../../jwt/jwt.service";
+import { JwtService, type TokenPayload } from "../../jwt/jwt.service";
 import bcrypt from "bcryptjs";
 import { getLanguage } from "../../../middlewares/lang.middleware";
 import { ErrorMessages } from "../../../common/errors/ErrorMessages";
@@ -19,6 +19,28 @@ export class AuthService extends RepoService<User> {
     // Bind methods to avoid losing context when used as callbacks
     this.register = this.register.bind(this);
     this.login = this.login.bind(this);
+    this.refreshAccessToken = this.refreshAccessToken.bind(this);
+  }
+
+  async refreshAccessToken(refreshToken: string) {
+    Ensure.required(refreshToken?.trim(), "refresh token");
+    const trimmed = refreshToken.trim();
+    let payload: TokenPayload;
+    try {
+      payload = JwtService.verifyRefreshToken(trimmed);
+    } catch {
+      Ensure.unauthorized(false, "token");
+      throw new Error("unreachable");
+    }
+    Ensure.isNumber(payload.userId, "user");
+    const user = await this.findOneByCondition({ id: payload.userId });
+    Ensure.exists(user, "user");
+    const accessToken = JwtService.signAccessToken({
+      userId: user!.id,
+      email: user!.email,
+      role: user!.role,
+    });
+    return { accessToken };
   }
 
   async register(params: RegisterParams) {

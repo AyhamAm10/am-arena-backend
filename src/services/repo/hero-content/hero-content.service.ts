@@ -15,12 +15,12 @@ export class HeroContentService extends RepoService<HeroContent> {
     this.getHeroContents = this.getHeroContents.bind(this);
   }
 
-  async createHeroContent(params: CreateHeroContentDto) {
-    Ensure.required(params.image, "image");
+  async createHeroContent(params: CreateHeroContentDto & { image_url: string }) {
+    Ensure.required(params.image_url, "image_url");
     Ensure.required(params.title, "title");
     Ensure.required(params.description, "description");
     return await this.create({
-      image: params.image,
+      image: params.image_url,
       title: params.title,
       description: params.description,
     });

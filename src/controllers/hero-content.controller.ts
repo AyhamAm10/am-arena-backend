@@ -39,7 +39,10 @@ export class HeroContentController {
       const dto = req.body as CreateHeroContentDto;
 
       const heroContentService = new HeroContentService();
-      const row = await heroContentService.createHeroContent(dto);
+      const row = await heroContentService.createHeroContent({
+        ...dto,
+        image_url: req.file?.path as string,
+      });
 
       return res.status(HttpStatusCode.CREATED).json(
         ApiResponse.success(

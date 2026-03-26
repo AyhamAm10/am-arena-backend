@@ -24,10 +24,17 @@ import heroContentRouter from "./routes/hero-content.route";
 dotenv.config();
 const app = express();
 
+const corsOriginsEnv = process.env.CORS_ORIGINS?.trim();
+const corsOrigin =
+  corsOriginsEnv && corsOriginsEnv.length > 0
+    ? corsOriginsEnv.split(",").map((o) => o.trim()).filter(Boolean)
+    : true;
+
 app.use(
   cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    origin: corsOrigin,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Accept-Language"],
   })
 );

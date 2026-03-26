@@ -8,12 +8,21 @@ import { AuthRegisterDto, authRegisterSchema } from "../dto/auth/auth-register.d
 import { AuthService } from "../services/repo/auth/auth.service";
 import { imageUrl } from "../utils/handle-generate-url";
 import { AuthLoginDto, authLoginSchema } from "../dto/auth/auth-login.dto";
+import { AuthRefreshDto, authRefreshSchema } from "../dto/auth/auth-refresh.dto";
 
 export class AuthController {
+  constructor() {
+    this.register = this.register.bind(this);
+    this.login = this.login.bind(this);
+    this.logout = this.logout.bind(this);
+    this.getMe = this.getMe.bind(this);
+    this.refresh = this.refresh.bind(this);
+  }
+
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const lang = (req.headers["accept-language"] as Language) || "en";
-      
+
       await validator(authRegisterSchema, req.body);
       const dto = req.body as AuthRegisterDto;
       const authService = new AuthService();
@@ -29,24 +38,22 @@ export class AuthController {
         password: dto.password,
         phone: dto.phone,
         gamer_name: dto.gamer_name,
-        profile_picture_url: image
+        profile_picture_url: image,
       });
 
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
-        maxAge: 30 * 24 * 60 * 60 * 1000, 
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
-      return res
-        .status(HttpStatusCode.CREATED)
-        .json(
-          ApiResponse.success(
-            { user, accessToken },
-            ErrorMessages.generateErrorMessage("user", "created", lang)
-          )
-        );
+      return res.status(HttpStatusCode.CREATED).json(
+        ApiResponse.success(
+          { user, accessToken, refreshToken },
+          ErrorMessages.generateErrorMessage("user", "created", lang)
+        )
+      );
     } catch (err) {
       next(err);
     }
@@ -55,7 +62,7 @@ export class AuthController {
   async login(req: Request, res: Response, next: NextFunction) {
     try {
       const lang = (req.headers["accept-language"] as Language) || "en";
-      
+
       await validator(authLoginSchema, req.body);
       const dto = req.body as AuthLoginDto;
 
@@ -66,8 +73,6 @@ export class AuthController {
         password: dto.password,
       });
 
-     
-
       res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -77,8 +82,30 @@ export class AuthController {
 
       return res.json(
         ApiResponse.success(
-          { user, accessToken },
+          { user, accessToken, refreshToken },
           ErrorMessages.generateErrorMessage("user", "logged in", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async refresh(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      await validator(authRefreshSchema, req.body ?? {});
+      const dto = req.body as AuthRefreshDto;
+      const cookieToken = req.cookies?.refreshToken as string | undefined;
+      const refreshToken = (cookieToken?.trim() || dto.refreshToken?.trim() || "") as string;
+
+      const authService = new AuthService();
+      const { accessToken } = await authService.refreshAccessToken(refreshToken);
+
+      return res.json(
+        ApiResponse.success(
+          { accessToken },
+          ErrorMessages.generateErrorMessage("token", "retrieved", lang)
         )
       );
     } catch (err) {
@@ -114,7 +141,10 @@ export class AuthController {
       }
 
       const authService = new AuthService();
-      const user = await authService.findOneByCondition({ id: userId } , ["achievements" , "friends" ]);
+      const user = await authService.findOneByCondition({ id: userId }, [
+        "achievements",
+        "friends",
+      ]);
 
       if (!user) {
         throw new APIError(
@@ -123,9 +153,7 @@ export class AuthController {
         );
       }
 
-      // Return minimal user info without password
-      const {password_hash , ...userInfo } = user
-        
+      const { password_hash, ...userInfo } = user;
 
       return res.json(
         ApiResponse.success(

@@ -4,18 +4,39 @@
       - Auth
     summary: Register a new user
     description: >
-      Creates a user account. Request body is JSON validated by authRegisterSchema
-      (full_name, gamer_name, email, password required; phone and profile_picture_url optional).
-      Sets refreshToken in an HTTP-only cookie. The controller supports req.file for a profile image
-      only if a multipart upload middleware is attached to the route (current route uses JSON only).
+      multipart/form-data with field profile_picture (image) and form fields matching authRegisterSchema
+      (full_name, gamer_name, email, password required; phone optional). Returns user, accessToken, and
+      refreshToken in JSON; also sets refreshToken as an HTTP-only cookie.
     operationId: register
     security: []
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
-            $ref: '#/components/schemas/AuthRegisterBody'
+            type: object
+            required:
+              - full_name
+              - gamer_name
+              - email
+              - password
+              - profile_picture
+            properties:
+              full_name:
+                type: string
+              gamer_name:
+                type: string
+              email:
+                type: string
+                format: email
+              password:
+                type: string
+                minLength: 6
+              phone:
+                type: string
+              profile_picture:
+                type: string
+                format: binary
     responses:
       '201':
         description: User created successfully
@@ -37,7 +58,7 @@
       - Auth
     summary: Login
     description: >
-      Returns user (without password_hash) and accessToken in JSON.
+      Returns user (without password_hash), accessToken, and refreshToken in JSON.
       Sets refreshToken in an HTTP-only cookie (same cookie options as register).
     operationId: login
     security: []
@@ -61,6 +82,45 @@
                       $ref: '#/components/schemas/AuthTokensResponse'
       '400':
         description: Invalid credentials
+
+/auth/refresh:
+  post:
+    tags:
+      - Auth
+    summary: Refresh access token
+    description: >
+      Verifies refresh token from httpOnly cookie and/or optional JSON body refreshToken.
+      Returns a new accessToken. Does not require Authorization header.
+    operationId: refreshTokens
+    security: []
+    parameters:
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthRefreshBody'
+    responses:
+      '200':
+        description: New access token issued
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/AuthRefreshResponse'
+      '400':
+        description: Missing or invalid refresh token
+      '401':
+        description: Unauthorized (invalid or expired refresh)
 
 /auth/logout:
   post:

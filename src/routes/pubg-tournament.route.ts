@@ -16,6 +16,8 @@ pubgTournamentRouter.get("/",
      pubgTournamentController.getPubgTournaments);
 pubgTournamentRouter.get("/:id/registration-fields", pubgTournamentController.getRegistrationFields);
 pubgTournamentRouter.post("/:id/register", authMiddleware, pubgTournamentController.registerForTournament);
-pubgTournamentRouter.get("/:id", authMiddleware, pubgTournamentController.getPubgTournament);
+pubgTournamentRouter.get("/:id",
+    //  authMiddleware,
+      pubgTournamentController.getPubgTournament);
 
 export default pubgTournamentRouter;
