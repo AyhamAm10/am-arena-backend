@@ -1,7 +1,10 @@
 import { Ensure } from "../../../common/errors/Ensure.handler";
+import { ErrorMessages } from "../../../common/errors/ErrorMessages";
+import { getLanguage } from "../../../middlewares/lang.middleware";
 import { User } from "../../../entities/User";
 import { RepoService } from "../../repo.service";
 import { GetBestUsersQueryDto } from "../../../dto/user/get-best-users-query.dto";
+import { ProfileUpdateDto } from "../../../dto/user/update-profile.dto";
 
 const LATEST_WON_TOURNAMENTS_LIMIT = 10;
 
@@ -11,6 +14,7 @@ export class UserService extends RepoService<User> {
     this.incrementXp = this.incrementXp.bind(this);
     this.getBestUsers = this.getBestUsers.bind(this);
     this.getUserProfile = this.getUserProfile.bind(this);
+    this.updateProfile = this.updateProfile.bind(this);
   }
 
   async incrementXp(userId: number, amount: number) {
@@ -91,5 +95,52 @@ export class UserService extends RepoService<User> {
       achievements,
       won_tournaments,
     };
+  }
+
+  async updateProfile(
+    userId: number,
+    dto: ProfileUpdateDto,
+    profilePictureUrl?: string
+  ) {
+    Ensure.isNumber(userId, "user");
+
+    const payload: Partial<
+      Pick<
+        User,
+        "full_name" | "gamer_name" | "email" | "phone" | "profile_picture_url"
+      >
+    > = {};
+
+    if (dto.full_name !== undefined) payload.full_name = dto.full_name;
+    if (dto.gamer_name !== undefined) payload.gamer_name = dto.gamer_name;
+    if (dto.email !== undefined) payload.email = dto.email;
+    if (dto.phone !== undefined) payload.phone = dto.phone;
+    if (profilePictureUrl !== undefined) {
+      payload.profile_picture_url = profilePictureUrl;
+    }
+
+    Ensure.custom(
+      Object.keys(payload).length > 0,
+      ErrorMessages.generateErrorMessage("profile", "missing fields", getLanguage())
+    );
+
+    if (payload.email !== undefined) {
+      const taken = await this.repo.findOne({
+        where: { email: payload.email },
+        select: ["id"],
+      });
+      Ensure.alreadyExists(!!(taken && taken.id !== userId), "email");
+    }
+
+    if (payload.phone !== undefined) {
+      const taken = await this.repo.findOne({
+        where: { phone: payload.phone },
+        select: ["id"],
+      });
+      Ensure.alreadyExists(!!(taken && taken.id !== userId), "phone");
+    }
+
+    await this.repo.update(userId, payload as any);
+    return this.getUserProfile(userId);
   }
 }

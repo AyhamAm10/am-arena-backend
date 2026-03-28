@@ -1,6 +1,14 @@
 import multer from "multer";
 
-const imageMimeTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+const imageMimeTypes = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {

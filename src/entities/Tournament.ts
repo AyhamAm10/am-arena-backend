@@ -47,11 +47,11 @@ export class Tournament {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @ManyToMany(() => User)
+  @ManyToMany(() => User, (user) => user.wonTournaments)
   @JoinTable({
-    name: 'tournament_winners', 
-    joinColumn: { name: 'tournament_id', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    name: "tournament_winners",
+    joinColumn: { name: "tournament_id", referencedColumnName: "id" },
+    inverseJoinColumn: { name: "user_id", referencedColumnName: "id" },
   })
   winners: User[];
 

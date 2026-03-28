@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { Language } from "../common/errors/Ensure.handler";
+import { Ensure, Language } from "../common/errors/Ensure.handler";
 import { ApiResponse } from "../common/responses/api.response";
 import { ErrorMessages } from "../common/errors/ErrorMessages";
 import { validator } from "../common/errors/validator";
@@ -11,12 +11,17 @@ import {
   GetUserProfileParamsDto,
   getUserProfileParamsSchema,
 } from "../dto/user/get-user-profile-params.dto";
+import {
+  ProfileUpdateDto,
+  profileUpdateSchema,
+} from "../dto/user/update-profile.dto";
 import { UserService } from "../services/repo/user/user.service";
-
+import { imageUrl } from "../utils/handle-generate-url";
 export class UserController {
   constructor() {
     this.getBestUsers = this.getBestUsers.bind(this);
     this.getUserProfile = this.getUserProfile.bind(this);
+    this.updateProfile = this.updateProfile.bind(this);
   }
 
   async getBestUsers(req: Request, res: Response, next: NextFunction) {
@@ -63,6 +68,42 @@ export class UserController {
         ApiResponse.success(
           profile,
           ErrorMessages.generateErrorMessage("user", "retrieved", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async updateProfile(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+
+      const userId = (req as Request & { currentUser?: number }).currentUser;
+      Ensure.exists(userId, "user");
+
+      const dto = (await validator(
+        profileUpdateSchema,
+        req.body
+      )) as ProfileUpdateDto;
+
+      console.log("FILE:", req.file);
+      console.log("BODY:", req.body);
+
+      const profilePictureUrl = req.file
+        ? imageUrl(req.file.filename)
+        : undefined;
+      const userService = new UserService();
+      const profile = await userService.updateProfile(
+        userId as number,
+        dto,
+        profilePictureUrl
+      );
+
+      return res.json(
+        ApiResponse.success(
+          profile,
+          ErrorMessages.generateErrorMessage("user", "updated", lang)
         )
       );
     } catch (err) {
