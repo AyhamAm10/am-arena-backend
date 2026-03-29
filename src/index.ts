@@ -21,6 +21,8 @@ import achievementRouter from "./routes/achievement.route";
 import reelRouter from "./routes/reel.route";
 import userRouter from "./routes/user.route";
 import heroContentRouter from "./routes/hero-content.route";
+import chatRouter from "./routes/chat.route";
+import adminRouter from "./routes/admin.route";
 dotenv.config();
 const app = express();
 
@@ -35,7 +37,7 @@ app.use(
     origin: corsOrigin,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept-Language"],
+    allowedHeaders: ["Content-Type", "Authorization", "Accept-Language", "x-dashboard-role"],
   })
 );
 
@@ -85,6 +87,8 @@ router.use("/achievement", achievementRouter);
 router.use("/reel", reelRouter);
 router.use("/user", userRouter);
 router.use("/hero-content", heroContentRouter);
+router.use("/chat", chatRouter);
+router.use("/admin", adminRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 

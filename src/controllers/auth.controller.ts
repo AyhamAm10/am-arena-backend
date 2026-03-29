@@ -143,6 +143,7 @@ export class AuthController {
       const authService = new AuthService();
       const user = await authService.findOneByCondition({ id: userId }, [
         "achievements",
+        "achievements.achievement",
         "friends",
       ]);
 

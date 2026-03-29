@@ -2,9 +2,8 @@ import * as yup from "yup";
 
 export const getUserProfileParamsSchema = yup.object({
   id: yup
-    .string()
+    .number()
     .required()
-    .matches(/^\d+$/)
     .transform((val) => parseInt(val, 10)),
 });
 

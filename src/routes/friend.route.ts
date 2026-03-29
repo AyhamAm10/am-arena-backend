@@ -8,6 +8,7 @@ const friendController = new FriendController();
 friendRouter.post("/request", authMiddleware, friendController.sendRequest);
 friendRouter.post("/accept", authMiddleware, friendController.acceptRequest);
 friendRouter.get("/", authMiddleware, friendController.getFriends);
+friendRouter.delete("/pending", authMiddleware, friendController.removePendingFriendship);
 friendRouter.delete("/", authMiddleware, friendController.removeFriendship);
 
 export default friendRouter;

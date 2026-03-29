@@ -20,4 +20,10 @@ export class ChatMemberService extends RepoService<ChatMember> {
       user_id: userId,
     } as any);
   }
+
+  async countByChatId(chatId: number): Promise<number> {
+    return await this.repo.count({
+      where: { chat: { id: chatId } } as any,
+    });
+  }
 }

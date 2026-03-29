@@ -6,6 +6,7 @@ const registrationFieldTypeEnum = ["string", "number", "boolean", "select"] as c
 const gameSchema = yup.object({
   type: yup.string().oneOf(pubgTypeEnum).optional(),
   map: yup.string().optional(),
+  image: yup.string().optional(),
 });
 
 const registrationFieldSchema = yup.object({

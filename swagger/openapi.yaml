@@ -237,12 +237,17 @@ components:
       type: object
       required:
         - title
-        - video_url
         - description
       properties:
         title:
           type: string
-        video_url:
+        description:
+          type: string
+
+    UpdateReelBody:
+      type: object
+      properties:
+        title:
           type: string
         description:
           type: string
@@ -259,6 +264,69 @@ components:
           minimum: 1
           maximum: 100
           default: 10
+
+    ReelCommentFeedItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        comment:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        user:
+          type: object
+          nullable: true
+          description: Comment author when loaded
+
+    ReelFeedItem:
+      type: object
+      required:
+        - id
+        - title
+        - video_url
+        - description
+        - created_at
+        - updated_at
+        - comments
+        - likes_count
+        - comments_count
+        - liked_by_current_user
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        video_url:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        user:
+          type: object
+          nullable: true
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReelCommentFeedItem'
+        likes_count:
+          type: integer
+          minimum: 0
+        comments_count:
+          type: integer
+          minimum: 0
+        liked_by_current_user:
+          type: boolean
+          description: True when Authorization Bearer is valid and the user liked this reel; otherwise false
 
     AddCommentBody:
       type: object
@@ -577,6 +645,9 @@ components:
             - type: string
         max_players:
           type: integer
+        registered_count:
+          type: integer
+          description: Present on GET /pubg-tournament list — current registration count
         start_date:
           type: string
           format: date-time

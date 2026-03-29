@@ -20,6 +20,7 @@ achievementRouter.patch(
   "/:id",
   authMiddleware,
   checkRole(adminRole),
+  uploadIcon.single("icon"),
   achievementController.updateAchievement
 );
 achievementRouter.delete(
@@ -34,6 +35,11 @@ achievementRouter.post(
   authMiddleware,
   checkRole(adminRole),
   achievementController.assignToUser
+);
+achievementRouter.patch(
+  "/user-achievement/:id/toggle-display",
+  authMiddleware,
+  achievementController.toggleDisplay
 );
 
 export default achievementRouter;

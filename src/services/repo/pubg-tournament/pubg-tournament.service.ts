@@ -13,6 +13,7 @@ import { ChatService } from "../chat/chat.service";
 import { ChatMemberService } from "../chat-member/chat-member.service";
 import { UserService } from "../user/user.service";
 import { PubgType } from "../../../entities/PubgGame";
+import { AppDataSource } from "../../../config/data_source";
 import { In } from "typeorm";
 type CreatePubgTournamentParams = CreatePubgTournamentDto & { createdById: number; image: string };
 type UpdatePubgTournamentParams = UpdatePubgTournamentDto;
@@ -28,6 +29,9 @@ export class PubgTournamentService extends RepoService<Tournament> {
     this.getPubgTournaments = this.getPubgTournaments.bind(this);
     this.getRegistrationFields = this.getRegistrationFields.bind(this);
     this.registerForTournament = this.registerForTournament.bind(this);
+    this.assignWinners = this.assignWinners.bind(this);
+    this.getRegistrations = this.getRegistrations.bind(this);
+    this.removeRegistration = this.removeRegistration.bind(this);
   }
 
   async createPubgTournament(params: CreatePubgTournamentParams) {
@@ -89,6 +93,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
       const gameData: Record<string, unknown> = {};
       if (params.game.type !== undefined) gameData.type = params.game.type;
       if (params.game.map !== undefined) gameData.map = params.game.map;
+      if (params.game.image !== undefined) gameData.image = params.game.image;
       await pubgService.update(tournament.game_ref_id, gameData);
     }
 
@@ -149,19 +154,29 @@ export class PubgTournamentService extends RepoService<Tournament> {
   }
 
   async getPubgTournaments(options: GetPubgTournamentsQueryDto) {
-    const { page = 1, limit = 10 } = options;
-    const data = await this.getAllWithPagination({ page, limit });
+    const { page = 1, limit = 10, is_active } = options;
+    const where: any = {};
+    if (is_active !== undefined && is_active !== null) {
+      where.is_active = is_active;
+    }
+    const data = await this.getAllWithPagination({ page, limit, where });
 
     const pubgService = new PubgService();
+
+    const pubgRegistrationService = new PubgRegistrationService();
 
     data.data = await Promise.all(
       data.data.map(async (tournament: Tournament) => {
         const game = await pubgService.getById(tournament.game_ref_id);
         const registrationFields = await this.getRegistrationFields(tournament.id);
+        const registered_count = await pubgRegistrationService.countByTournamentId(
+          tournament.id
+        );
         return {
           ...tournament,
           registration_fields: registrationFields,
           game,
+          registered_count,
         };
       })
     );
@@ -208,6 +223,19 @@ export class PubgTournamentService extends RepoService<Tournament> {
     const existing = await pubgRegistrationService.findByTournamentAndUser(tid, userId);
     Ensure.custom(!existing, "You are already registered for this tournament");
 
+    Ensure.custom(tournament.is_active, "This tournament is no longer active");
+
+    const user = await userService.findOneByCondition({ id: userId } as any);
+    Ensure.exists(user, "user");
+    const entryFee = Number(tournament.entry_fee) || 0;
+    if (entryFee > 0) {
+      Ensure.custom(
+        Number(user!.coins) >= entryFee,
+        "Insufficient balance to join this tournament"
+      );
+      await userService.deductCoins(userId, entryFee);
+    }
+
     const game = await pubgService.getById(tournament.game_ref_id);
     Ensure.exists(game, "pubg game");
 
@@ -248,6 +276,61 @@ export class PubgTournamentService extends RepoService<Tournament> {
     await chatMemberService.addMember(chat!.id, userId);
 
     return registration;
+  }
+
+  async assignWinners(tournamentId: string | number, userIds: number[]) {
+    const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
+    const tournamentRepo = AppDataSource.getRepository(Tournament);
+    const tournament = await tournamentRepo.findOne({
+      where: { id: tid },
+      relations: ["winners"],
+    });
+    Ensure.exists(tournament, "tournament");
+
+    const pubgRegistrationService = new PubgRegistrationService();
+    for (const uid of userIds) {
+      const reg = await pubgRegistrationService.findByTournamentAndUser(tid, uid);
+      Ensure.custom(!!reg, `User ${uid} is not registered for this tournament`);
+    }
+
+    tournament!.winners = userIds.map((id) => ({ id }) as any);
+    tournament!.is_active = false;
+    await tournamentRepo.save(tournament!);
+
+    return tournament;
+  }
+
+  async getRegistrations(tournamentId: string | number, page = 1, limit = 50) {
+    const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
+    await this.getById(tid);
+
+    const pubgRegistrationService = new PubgRegistrationService();
+    const skip = (page - 1) * limit;
+    const [data, total] = await pubgRegistrationService.findByTournamentIdPaginated(tid, skip, limit);
+
+    return { data, total, page, limit };
+  }
+
+  async removeRegistration(tournamentId: string | number, userId: number) {
+    const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
+    await this.getById(tid);
+
+    const pubgRegistrationService = new PubgRegistrationService();
+    const reg = await pubgRegistrationService.deleteByTournamentAndUser(tid, userId);
+    Ensure.exists(reg, "registration");
+
+    const chatService = new ChatService();
+    const chat = await chatService.findByTournamentId(tid);
+    if (chat) {
+      const chatMemberService = new ChatMemberService();
+      const member = await chatMemberService.findOneByCondition({
+        chat_id: chat.id,
+        user_id: userId,
+      } as any);
+      if (member) {
+        await chatMemberService.delete((member as any).id);
+      }
+    }
   }
 
 }

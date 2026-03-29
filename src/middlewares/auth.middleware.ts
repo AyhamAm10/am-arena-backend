@@ -7,6 +7,48 @@ import { User } from "../entities/User";
 import { JwtService } from "../services/jwt/jwt.service";
 import { getLanguage } from "./lang.middleware";
 import { Ensure } from "../common/errors/Ensure.handler";
+import { resolveDashboardRoleUser } from "./dashboard-role.middleware";
+
+export const optionalAuthMiddleware = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const dashboardUser = await resolveDashboardRoleUser(
+      req.headers["x-dashboard-role"] as string | undefined
+    );
+
+    if (dashboardUser) {
+      req.currentUser = dashboardUser.id;
+      return next();
+    }
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return next();
+    }
+
+    const accessToken = authHeader.split(" ")[1];
+    if (!accessToken) return next();
+
+    try {
+      const decoded = JwtService.verifyAccessToken(accessToken);
+      const userId = decoded?.userId;
+      if (userId) {
+        const userRepository = AppDataSource.getRepository(User);
+        const user = await userRepository.findOne({ where: { id: userId } });
+        if (user) req.currentUser = user.id;
+      }
+    } catch {
+      // token invalid/expired – continue as unauthenticated
+    }
+
+    return next();
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const authMiddleware = async (
   req: Request,
@@ -16,6 +58,14 @@ export const authMiddleware = async (
   try {
     const lang = getLanguage();
     const authHeader = req.headers.authorization;
+    const dashboardUser = await resolveDashboardRoleUser(
+      req.headers["x-dashboard-role"] as string | undefined
+    );
+
+    if (dashboardUser) {
+      req.currentUser = dashboardUser.id;
+      return next();
+    }
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next(

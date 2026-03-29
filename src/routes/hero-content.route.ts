@@ -22,6 +22,7 @@ heroContentRouter.patch(
   "/:id",
   authMiddleware,
   checkRole(adminRole),
+  upload.single("image"),
   heroContentController.updateHeroContent
 );
 heroContentRouter.delete(

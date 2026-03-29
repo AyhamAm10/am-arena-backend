@@ -8,6 +8,10 @@ import {
   getBestUsersQuerySchema,
 } from "../dto/user/get-best-users-query.dto";
 import {
+  SearchUsersQueryDto,
+  searchUsersQuerySchema,
+} from "../dto/user/search-users-query.dto";
+import {
   GetUserProfileParamsDto,
   getUserProfileParamsSchema,
 } from "../dto/user/get-user-profile-params.dto";
@@ -22,6 +26,7 @@ export class UserController {
     this.getBestUsers = this.getBestUsers.bind(this);
     this.getUserProfile = this.getUserProfile.bind(this);
     this.updateProfile = this.updateProfile.bind(this);
+    this.searchUsers = this.searchUsers.bind(this);
   }
 
   async getBestUsers(req: Request, res: Response, next: NextFunction) {
@@ -52,6 +57,39 @@ export class UserController {
     }
   }
 
+  async searchUsers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      Ensure.exists(userId, "user");
+
+      const dto = (await validator(
+        searchUsersQuerySchema,
+        req.query
+      )) as SearchUsersQueryDto;
+
+      const userService = new UserService();
+      const { data, total, page, limit } = await userService.searchUsers(
+        userId,
+        dto
+      );
+
+      return res.json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage("user", "retrieved", lang),
+          {
+            count: total,
+            page,
+            limit,
+          }
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getUserProfile(req: Request, res: Response, next: NextFunction) {
     try {
       const lang = (req.headers["accept-language"] as Language) || "en";
@@ -61,8 +99,9 @@ export class UserController {
         req.params
       )) as GetUserProfileParamsDto;
 
+      const requestingUserId = (req as any).currentUser as number | undefined;
       const userService = new UserService();
-      const profile = await userService.getUserProfile(Number(dto.id));
+      const profile = await userService.getUserProfile(dto.id, requestingUserId);
 
       return res.json(
         ApiResponse.success(

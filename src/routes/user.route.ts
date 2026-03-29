@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { UserController } from "../controllers/user.controller";
-import { authMiddleware } from "../middlewares/auth.middleware";
+import { authMiddleware, optionalAuthMiddleware } from "../middlewares/auth.middleware";
 import { upload } from "../middlewares/upload";
 
 const userRouter = Router();
@@ -16,6 +16,7 @@ const updateProfileMiddleware = [
 userRouter.post("/profile", ...updateProfileMiddleware);
 // PATCH: kept for API compatibility.
 userRouter.patch("/profile", ...updateProfileMiddleware);
-userRouter.get("/:id/profile", userController.getUserProfile);
+userRouter.get("/search", authMiddleware, userController.searchUsers);
+userRouter.get("/:id/profile", optionalAuthMiddleware, userController.getUserProfile);
 
 export default userRouter;

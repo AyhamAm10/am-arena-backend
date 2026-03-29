@@ -15,4 +15,7 @@ export class UserAchievement {
 
   @Column({ type: "timestamp" })
   obtained_at: Date;
+
+  @Column({ default: false })
+  displayed: boolean;
 }

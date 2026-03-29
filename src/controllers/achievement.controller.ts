@@ -9,6 +9,7 @@ import { UpdateAchievementDto, updateAchievementSchema } from "../dto/achievemen
 import { GetAchievementsQueryDto, getAchievementsQuerySchema } from "../dto/achievement/get-achievements-query.dto";
 import { AssignAchievementDto, assignAchievementSchema } from "../dto/achievement/assign-achievement.dto";
 import { AchievementService } from "../services/repo/achievement/achievement.service";
+import { UserAchievementService } from "../services/repo/user-achievement/user-achievement.service";
 import { Ensure } from "../common/errors/Ensure.handler";
 
 export class AchievementController {
@@ -18,6 +19,7 @@ export class AchievementController {
     this.deleteAchievement = this.deleteAchievement.bind(this);
     this.getAchievements = this.getAchievements.bind(this);
     this.assignToUser = this.assignToUser.bind(this);
+    this.toggleDisplay = this.toggleDisplay.bind(this);
   }
 
   async createAchievement(req: Request, res: Response, next: NextFunction) {
@@ -51,9 +53,13 @@ export class AchievementController {
       await validator(updateAchievementSchema, req.body);
       const dto = req.body as UpdateAchievementDto;
       const id = req.params.id as string;
+      const payload: UpdateAchievementDto = {
+        ...dto,
+        ...(req.file ? { icon_url: `icons/${req.file.filename}` } : {}),
+      };
 
       const achievementService = new AchievementService();
-      const result = await achievementService.updateAchievement(id, dto);
+      const result = await achievementService.updateAchievement(id, payload);
 
       return res.json(
         ApiResponse.success(
@@ -119,6 +125,28 @@ export class AchievementController {
         ApiResponse.success(
           result,
           ErrorMessages.generateErrorMessage("achievement", "created", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async toggleDisplay(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      Ensure.exists(userId, "user");
+      const id = parseInt(req.params.id as string, 10);
+      Ensure.isNumber(id, "user_achievement_id");
+
+      const service = new UserAchievementService();
+      const result = await service.toggleDisplayed(id, userId);
+
+      return res.json(
+        ApiResponse.success(
+          result,
+          ErrorMessages.generateErrorMessage("achievement", "updated", lang)
         )
       );
     } catch (err) {

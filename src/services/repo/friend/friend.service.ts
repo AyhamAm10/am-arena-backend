@@ -10,6 +10,7 @@ export class FriendService extends RepoService<Friend> {
     this.acceptRequest = this.acceptRequest.bind(this);
     this.getFriends = this.getFriends.bind(this);
     this.removeFriendship = this.removeFriendship.bind(this);
+    this.removePendingFriendship = this.removePendingFriendship.bind(this);
   }
 
   async sendRequest(userId: number, friendUserId: number) {
@@ -45,7 +46,7 @@ export class FriendService extends RepoService<Friend> {
   }
 
   async getFriends(userId: number, query: GetFriendsQueryDto) {
-    const { status, gamer_name, page = 1, limit = 10 } = query;
+    const { status, direction, gamer_name, page = 1, limit = 10 } = query;
     const skip = (page - 1) * limit;
 
     const qb = this.repo
@@ -56,6 +57,12 @@ export class FriendService extends RepoService<Friend> {
 
     if (status) {
       qb.andWhere("friend.status = :status", { status });
+    }
+    if (String(status) === FriendStatus.PENDING && direction === "incoming") {
+      qb.andWhere("friend.friend_user_id = :userId", { userId });
+    }
+    if (String(status) === FriendStatus.PENDING && direction === "outgoing") {
+      qb.andWhere("friend.user_id = :userId", { userId });
     }
     if (gamer_name && gamer_name.trim()) {
       qb.andWhere(
@@ -87,6 +94,28 @@ export class FriendService extends RepoService<Friend> {
 
     const record = recordA || recordB;
     Ensure.exists(record, "friendship");
+
+    await this.repo.delete({
+      user_id: (record as any).user_id,
+      friend_user_id: (record as any).friend_user_id,
+    });
+  }
+
+  /** Deletes a pending row whether current user sent or received the request. */
+  async removePendingFriendship(currentUserId: number, otherUserId: number) {
+    const recordA = await this.findOneByCondition({
+      user_id: currentUserId,
+      friend_user_id: otherUserId,
+      status: FriendStatus.PENDING,
+    } as any);
+    const recordB = await this.findOneByCondition({
+      user_id: otherUserId,
+      friend_user_id: currentUserId,
+      status: FriendStatus.PENDING,
+    } as any);
+
+    const record = recordA || recordB;
+    Ensure.exists(record, "friend request");
 
     await this.repo.delete({
       user_id: (record as any).user_id,

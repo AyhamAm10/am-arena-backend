@@ -16,9 +16,17 @@
     requestBody:
       required: true
       content:
-        application/json:
+        multipart/form-data:
           schema:
-            $ref: '#/components/schemas/CreateReelBody'
+            allOf:
+              - $ref: '#/components/schemas/CreateReelBody'
+              - type: object
+                required:
+                  - video
+                properties:
+                  video:
+                    type: string
+                    format: binary
     responses:
       '201':
         description: Reel created
@@ -40,10 +48,18 @@
     tags:
       - Reels
     summary: Get reels
-    description: Paginated list of reels.
+    description: |
+      Paginated feed. Each reel includes comments (with users), like/comment counts, and whether the current user liked it.
+      Optional `Authorization: Bearer` — when valid, `liked_by_current_user` is personalized; when omitted or invalid, it is always false.
     operationId: getReels
     security: []
     parameters:
+      - name: Authorization
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Optional Bearer token for liked_by_current_user
       - name: Accept-Language
         in: header
         schema:
@@ -75,9 +91,100 @@
                     data:
                       type: array
                       items:
-                        type: object
+                        $ref: '#/components/schemas/ReelFeedItem'
                     meta:
                       type: object
+
+/reel/{id}:
+  patch:
+    tags:
+      - Reels
+    summary: Update reel
+    description: Updates a reel. Only the owner may update. Provide at least one of title, description, or a new video file.
+    operationId: updateReel
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Reel ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UpdateReelBody'
+        multipart/form-data:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/UpdateReelBody'
+              - type: object
+                properties:
+                  video:
+                    type: string
+                    format: binary
+    responses:
+      '200':
+        description: Reel updated
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ApiResponse'
+                - type: object
+                  properties:
+                    data:
+                      type: object
+                      description: Reel entity
+      '400':
+        description: Validation error
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (not the reel owner)
+      '404':
+        description: Reel not found
+  delete:
+    tags:
+      - Reels
+    summary: Delete reel
+    description: Deletes a reel and its comments and likes. Only the owner may delete.
+    operationId: deleteReel
+    security:
+      - bearerAuth: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Reel ID
+      - name: Accept-Language
+        in: header
+        schema:
+          type: string
+          example: en
+    responses:
+      '200':
+        description: Reel deleted
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Unauthorized
+      '403':
+        description: Forbidden (not the reel owner)
+      '404':
+        description: Reel not found
 
 /reel/{id}/comment:
   post:

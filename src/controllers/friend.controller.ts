@@ -8,6 +8,7 @@ import { SendFriendRequestDto, sendFriendRequestSchema } from "../dto/friend/sen
 import { AcceptFriendRequestDto, acceptFriendRequestSchema } from "../dto/friend/accept-friend-request.dto";
 import { GetFriendsQueryDto, getFriendsQuerySchema } from "../dto/friend/get-friends-query.dto";
 import { RemoveFriendshipDto, removeFriendshipSchema } from "../dto/friend/remove-friendship.dto";
+import { RemovePendingFriendDto, removePendingFriendSchema } from "../dto/friend/remove-pending-friend.dto";
 import { FriendService } from "../services/repo/friend/friend.service";
 import { Ensure } from "../common/errors/Ensure.handler";
 
@@ -17,6 +18,7 @@ export class FriendController {
     this.acceptRequest = this.acceptRequest.bind(this);
     this.getFriends = this.getFriends.bind(this);
     this.removeFriendship = this.removeFriendship.bind(this);
+    this.removePendingFriendship = this.removePendingFriendship.bind(this);
   }
 
   async sendRequest(req: Request, res: Response, next: NextFunction) {
@@ -104,6 +106,29 @@ export class FriendController {
         ApiResponse.success(
           {},
           ErrorMessages.generateErrorMessage("friendship", "deleted", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removePendingFriendship(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      Ensure.exists(userId, "user");
+
+      await validator(removePendingFriendSchema, req.body);
+      const dto = req.body as RemovePendingFriendDto;
+
+      const friendService = new FriendService();
+      await friendService.removePendingFriendship(userId, dto.friend_user_id);
+
+      return res.json(
+        ApiResponse.success(
+          {},
+          ErrorMessages.generateErrorMessage("friend request", "deleted", lang)
         )
       );
     } catch (err) {

@@ -22,7 +22,22 @@ import {
   getPubgTournamentsQuerySchema,
 } from "../dto/pubg-tournament/get-pubg-tournaments-query.dto";
 import { RegisterForTournamentDto, registerForTournamentSchema } from "../dto/pubg-tournament/register-for-tournament.dto";
+import { AssignWinnersDto, assignWinnersSchema } from "../dto/pubg-tournament/assign-winners.dto";
 import { PubgTournamentService } from "../services/repo/pubg-tournament/pubg-tournament.service";
+
+function normalizeMultipartTournamentBody(body: Request["body"]) {
+  const normalized = { ...body } as Record<string, unknown>;
+
+  if (typeof normalized.game === "string") {
+    normalized.game = JSON.parse(normalized.game);
+  }
+
+  if (typeof normalized.registration_fields === "string") {
+    normalized.registration_fields = JSON.parse(normalized.registration_fields);
+  }
+
+  return normalized;
+}
 
 export class PubgTournamentController {
   constructor() {
@@ -33,14 +48,19 @@ export class PubgTournamentController {
     this.getPubgTournaments = this.getPubgTournaments.bind(this);
     this.getRegistrationFields = this.getRegistrationFields.bind(this);
     this.registerForTournament = this.registerForTournament.bind(this);
+    this.assignWinners = this.assignWinners.bind(this);
+    this.getRegistrations = this.getRegistrations.bind(this);
+    this.removeRegistration = this.removeRegistration.bind(this);
   }
 
   async createPubgTournament(req: Request, res: Response, next: NextFunction) {
     try {
       const lang = (req.headers["accept-language"] as Language) || "ar";
 
-      await validator(createPubgTournamentSchema, req.body);
-      const dto = req.body as CreatePubgTournamentDto;
+      const dto = (await validator(
+        createPubgTournamentSchema,
+        normalizeMultipartTournamentBody(req.body),
+      )) as CreatePubgTournamentDto;
 
 
       const userId = (req as any).currentUser;
@@ -50,7 +70,7 @@ export class PubgTournamentController {
       const tournament = await pubgTournamentService.createPubgTournament({
         ...dto,
         createdById: userId,
-        image: req.file?.path as string,
+        image: (req.file?.path as string) || dto.game.image || "",
       });
 
       return res.status(HttpStatusCode.CREATED).json(
@@ -68,12 +88,25 @@ export class PubgTournamentController {
     try {
       const lang = (req.headers["accept-language"] as Language) || "en";
 
-      await validator(updatePubgTournamentSchema, req.body);
-      const dto = req.body as UpdatePubgTournamentDto;
+      const dto = (await validator(
+        updatePubgTournamentSchema,
+        normalizeMultipartTournamentBody(req.body),
+      )) as UpdatePubgTournamentDto;
       const id = req.params.id as string;
+      const payload: UpdatePubgTournamentDto = {
+        ...dto,
+        ...(req.file
+          ? {
+              game: {
+                ...(dto.game || {}),
+                image: req.file.path as string,
+              },
+            }
+          : {}),
+      };
 
       const pubgTournamentService = new PubgTournamentService();
-      const tournament = await pubgTournamentService.updatePubgTournament(id, dto);
+      const tournament = await pubgTournamentService.updatePubgTournament(id, payload);
 
       return res.json(
         ApiResponse.success(
@@ -186,6 +219,74 @@ export class PubgTournamentController {
         ApiResponse.success(
           registration,
           ErrorMessages.generateErrorMessage("registration", "created", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async assignWinners(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      await validator(assignWinnersSchema, req.body);
+      const dto = req.body as AssignWinnersDto;
+      const tournamentId = req.params.id as string;
+
+      const pubgTournamentService = new PubgTournamentService();
+      const tournament = await pubgTournamentService.assignWinners(
+        tournamentId,
+        dto.user_ids as number[]
+      );
+
+      return res.json(
+        ApiResponse.success(
+          tournament,
+          ErrorMessages.generateErrorMessage("tournament winners", "created", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getRegistrations(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const tournamentId = req.params.id as string;
+      const page = Number(req.query.page) || 1;
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+      const pubgTournamentService = new PubgTournamentService();
+      const { data, total, page: p, limit: l } =
+        await pubgTournamentService.getRegistrations(tournamentId, page, limit);
+
+      return res.json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage("registrations", "retrieved", lang),
+          { count: total, page: p, limit: l }
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async removeRegistration(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const tournamentId = req.params.id as string;
+      const userId = Number(req.params.userId);
+      Ensure.isNumber(userId, "userId");
+
+      const pubgTournamentService = new PubgTournamentService();
+      await pubgTournamentService.removeRegistration(tournamentId, userId);
+
+      return res.json(
+        ApiResponse.success(
+          {},
+          ErrorMessages.generateErrorMessage("registration", "deleted", lang)
         )
       );
     } catch (err) {
