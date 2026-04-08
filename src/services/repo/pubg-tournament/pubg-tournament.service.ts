@@ -12,6 +12,7 @@ import { PubgRegistrationFieldValueService } from "../pubg-registration-field-va
 import { ChatService } from "../chat/chat.service";
 import { ChatMemberService } from "../chat-member/chat-member.service";
 import { UserService } from "../user/user.service";
+import { NotificationService } from "../notification/notification.service";
 import { PubgType } from "../../../entities/PubgGame";
 import { AppDataSource } from "../../../config/data_source";
 import { In } from "typeorm";
@@ -80,6 +81,11 @@ export class PubgTournamentService extends RepoService<Tournament> {
       tournament: { id: tournament.id } as any,
       allow_user_messages: true,
     } as any);
+
+    if (params.notify_all_users) {
+      const notificationService = new NotificationService();
+      await notificationService.notifyTournamentCreated(tournament.id, tournament.title);
+    }
 
     return tournament;
   }
@@ -296,6 +302,15 @@ export class PubgTournamentService extends RepoService<Tournament> {
     tournament!.winners = userIds.map((id) => ({ id }) as any);
     tournament!.is_active = false;
     await tournamentRepo.save(tournament!);
+
+    if (userIds.length > 0) {
+      const notificationService = new NotificationService();
+      const title = "Tournament result";
+      const body = `You won: ${tournament!.title}`;
+      await notificationService.notifySystemUsers(userIds, title, body, {
+        tournamentId: tid,
+      });
+    }
 
     return tournament;
   }

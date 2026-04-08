@@ -24,6 +24,43 @@ export class UserService extends RepoService<User> {
     this.getUserProfile = this.getUserProfile.bind(this);
     this.updateProfile = this.updateProfile.bind(this);
     this.searchUsers = this.searchUsers.bind(this);
+    this.setExpoPushToken = this.setExpoPushToken.bind(this);
+    this.getActiveUserIdsPage = this.getActiveUserIdsPage.bind(this);
+    this.findPushTokensForUserIds = this.findPushTokensForUserIds.bind(this);
+  }
+
+  async setExpoPushToken(userId: number, token: string | null) {
+    await this.repo.update(userId, {
+      expo_push_token: token,
+      expo_push_token_updated_at: token ? new Date() : null,
+    } as any);
+  }
+
+  async getActiveUserIdsPage(
+    page: number,
+    limit: number
+  ): Promise<{ ids: number[]; total: number }> {
+    const [rows, total] = await this.repo.findAndCount({
+      where: { is_active: true } as any,
+      select: ["id"],
+      order: { id: "ASC" },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+    return { ids: rows.map((r) => r.id), total };
+  }
+
+  async findPushTokensForUserIds(
+    userIds: number[]
+  ): Promise<{ id: number; expo_push_token: string }[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.repo.find({
+      where: { id: In(userIds) } as any,
+      select: ["id", "expo_push_token"],
+    });
+    return rows
+      .filter((u) => u.expo_push_token && String(u.expo_push_token).trim().length > 0)
+      .map((u) => ({ id: u.id, expo_push_token: u.expo_push_token as string }));
   }
 
   async deductCoins(userId: number, amount: number) {
@@ -159,18 +196,14 @@ export class UserService extends RepoService<User> {
     );
     const won_tournaments = wonSorted.slice(0, LATEST_WON_TOURNAMENTS_LIMIT);
 
-    const isOwnProfile = requestingUserId != null && requestingUserId === userId;
-    const rawAchievements = user.achievements ?? [];
-    const filteredAchievements = isOwnProfile
-      ? rawAchievements
-      : rawAchievements.filter((ua) => ua.displayed !== false);
-
-    const achievements = filteredAchievements.map((ua) => ({
-      id: ua.id,
-      obtained_at: ua.obtained_at,
-      displayed: ua.displayed,
-      achievement: ua.achievement ?? null,
-    }));
+    const achievements = (user.achievements ?? [])
+      .filter((ua) => ua.displayed === true)
+      .map((ua) => ({
+        id: ua.id,
+        obtained_at: ua.obtained_at,
+        displayed: ua.displayed,
+        achievement: ua.achievement ?? null,
+      }));
 
     const regRepo = AppDataSource.getRepository(PubgRegistration);
     const registrations = await regRepo.find({

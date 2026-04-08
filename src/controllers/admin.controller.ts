@@ -16,8 +16,11 @@ import {
   updateAdminChannelSchema,
 } from "../dto/admin/admin-chat.dto";
 import { createAdminNotificationSchema } from "../dto/admin/admin-notification.dto";
+import { createAdminMessageSchema } from "../dto/admin/admin-message.dto";
 import { getChannelsQuerySchema } from "../dto/chat/get-channels-query.dto";
 import { Ensure } from "../common/errors/Ensure.handler";
+import { getIO } from "../socket/io";
+import { NotificationService } from "../services/repo/notification/notification.service";
 import { updateReelSchema } from "../dto/reel/update-reel.dto";
 import {
   createSuperTournamentSchema,
@@ -33,6 +36,10 @@ function normalizeMultipartTournamentBody(body: Request["body"]) {
 
   if (typeof normalized.registration_fields === "string") {
     normalized.registration_fields = JSON.parse(normalized.registration_fields);
+  }
+
+  if (typeof normalized.notify_all_users === "string") {
+    normalized.notify_all_users = normalized.notify_all_users === "true";
   }
 
   return normalized;
@@ -55,6 +62,7 @@ export class AdminController {
     this.deleteNotification = this.deleteNotification.bind(this);
     this.updateReel = this.updateReel.bind(this);
     this.deleteReel = this.deleteReel.bind(this);
+    this.sendChannelMessage = this.sendChannelMessage.bind(this);
     this.getSuperTournaments = this.getSuperTournaments.bind(this);
     this.createSuperTournament = this.createSuperTournament.bind(this);
     this.updateSuperTournament = this.updateSuperTournament.bind(this);
@@ -196,6 +204,39 @@ export class AdminController {
         ApiResponse.success(
           {},
           ErrorMessages.generateErrorMessage("channel", "deleted", lang),
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async sendChannelMessage(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const currentUserId = req.currentUser;
+      Ensure.exists(currentUserId, "user");
+      const params = await validator(adminIdParamsSchema, req.params);
+      const dto = await validator(createAdminMessageSchema, req.body);
+      const result = await this.adminService.sendChannelMessage(params.id, currentUserId, dto.content);
+
+      const io = getIO();
+      if (io) {
+        io.to(`channel:${params.id}`).emit("new-message", result);
+      }
+
+      const notificationService = new NotificationService();
+      await notificationService.notifyChatMessageForChannelMembers({
+        channelId: params.id,
+        senderId: currentUserId,
+        contentPreview: dto.content,
+        channelTitle: (result as { channel_title?: string }).channel_title,
+      });
+
+      return res.status(HttpStatusCode.CREATED).json(
+        ApiResponse.success(
+          result,
+          ErrorMessages.generateErrorMessage("message", "created", lang),
         ),
       );
     } catch (error) {

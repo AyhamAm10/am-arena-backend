@@ -6,6 +6,15 @@ export class ChatMemberService extends RepoService<ChatMember> {
   constructor() {
     super(ChatMember);
     this.addMember = this.addMember.bind(this);
+    this.getUserIdsByChatId = this.getUserIdsByChatId.bind(this);
+  }
+
+  async getUserIdsByChatId(chatId: number): Promise<number[]> {
+    const rows = await this.repo.find({
+      where: { chat: { id: chatId } } as any,
+      select: ["user_id"],
+    });
+    return rows.map((r: any) => Number(r.user_id));
   }
 
   async addMember(chatId: number, userId: number) {

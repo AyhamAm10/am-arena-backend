@@ -17,6 +17,7 @@ import { ReelLike } from "../entities/ReelLike";
 import { Tournament } from "../entities/Tournament";
 import { User } from "../entities/User";
 import { UserAchievement } from "../entities/UserAchievement";
+import { UserNotification } from "../entities/UserNotification";
 
 
 dotenv.config();
@@ -51,7 +52,8 @@ export const AppDataSource = new DataSource({
     ReelLike,
     Tournament,
     User,
-    UserAchievement
+    UserAchievement,
+    UserNotification,
   ],
 
   migrations: [__dirname + "/../migrations/*.{js,ts}"],

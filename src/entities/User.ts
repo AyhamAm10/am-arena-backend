@@ -1,5 +1,5 @@
 // src/entities/User.ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany } from "typeorm";
 
 import { Message } from './Message';
 import { Chat } from './Chat';
@@ -8,6 +8,7 @@ import { PubgRegistration } from './PubgRegistration';
 import { Reel } from './Reel';
 import { Friend } from './Friend';
 import { UserAchievement } from './UserAchievement';
+import { UserNotification } from './UserNotification';
 
 
 export enum UserRole {
@@ -51,6 +52,12 @@ export class User {
   @Column({ type: 'int', default: 0 })
   xp_points: number;
 
+  @Column({ type: 'text', nullable: true })
+  expo_push_token: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  expo_push_token_updated_at: Date | null;
+
   @CreateDateColumn()
   created_at: Date;
 
@@ -81,4 +88,7 @@ export class User {
 
   @ManyToMany(() => Tournament, (tournament) => tournament.winners)
   wonTournaments: Tournament[];
+
+  @OneToMany(() => UserNotification, (n) => n.user)
+  notifications: UserNotification[];
 }

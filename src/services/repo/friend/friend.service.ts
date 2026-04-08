@@ -2,6 +2,7 @@ import { Ensure } from "../../../common/errors/Ensure.handler";
 import { Friend, FriendStatus } from "../../../entities/Friend";
 import { RepoService } from "../../repo.service";
 import { GetFriendsQueryDto } from "../../../dto/friend/get-friends-query.dto";
+import { NotificationService } from "../notification/notification.service";
 
 export class FriendService extends RepoService<Friend> {
   constructor() {
@@ -26,11 +27,19 @@ export class FriendService extends RepoService<Friend> {
     } as any);
     Ensure.custom(!existingA && !existingB, "Friend request already exists or already friends");
 
-    return await this.create({
+    const row = await this.create({
       user_id: userId,
       friend_user_id: friendUserId,
       status: FriendStatus.PENDING,
     } as any);
+
+    const notificationService = new NotificationService();
+    await notificationService.notifyFriendRequest({
+      receiverUserId: friendUserId,
+      fromUserId: userId,
+    });
+
+    return row;
   }
 
   async acceptRequest(currentUserId: number, requesterId: number) {

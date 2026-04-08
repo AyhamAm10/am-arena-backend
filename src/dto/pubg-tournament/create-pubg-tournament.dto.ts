@@ -1,4 +1,4 @@
-import * as yup from "yup";
+﻿import * as yup from "yup";
 
 const pubgTypeEnum = ["solo", "duo", "squad"] as const;
 const registrationFieldTypeEnum = ["string", "number", "boolean", "select"] as const;
@@ -27,6 +27,7 @@ export const createPubgTournamentSchema = yup.object({
   end_date: yup.string().optional().nullable(),
   is_active: yup.boolean().optional().default(true),
   registration_fields: yup.array().of(registrationFieldSchema).optional().default([]),
+  notify_all_users: yup.boolean().optional().default(false),
 });
 
 export type CreatePubgTournamentDto = yup.InferType<typeof createPubgTournamentSchema>;

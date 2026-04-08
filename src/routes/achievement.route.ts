@@ -30,6 +30,7 @@ achievementRouter.delete(
   achievementController.deleteAchievement
 );
 achievementRouter.get("/", authMiddleware, achievementController.getAchievements);
+achievementRouter.get("/my-achievements", authMiddleware, achievementController.getMyAchievements);
 achievementRouter.post(
   "/:id/assign",
   authMiddleware,

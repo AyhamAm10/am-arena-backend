@@ -22,6 +22,8 @@ adminRouter.post("/channels", adminController.createChannel);
 adminRouter.patch("/channels/:id", adminController.updateChannel);
 adminRouter.delete("/channels/:id", adminController.deleteChannel);
 
+adminRouter.post("/channels/:id/messages", adminController.sendChannelMessage);
+
 adminRouter.get("/notifications", adminController.getNotifications);
 adminRouter.post("/notifications", adminController.createNotification);
 adminRouter.delete("/notifications/:id", adminController.deleteNotification);

@@ -6,6 +6,7 @@ import { UpdateAchievementDto } from "../../../dto/achievement/update-achievemen
 import { GetAchievementsQueryDto } from "../../../dto/achievement/get-achievements-query.dto";
 import { UserAchievementService } from "../user-achievement/user-achievement.service";
 import { UserService } from "../user/user.service";
+import { NotificationService } from "../notification/notification.service";
 
 type CreateAchievementParams = CreateAchievementDto & { icon_url?: string };
 
@@ -79,6 +80,13 @@ export class AchievementService extends RepoService<Achievement> {
     } as any);
 
     await userService.incrementXp(userId, achievement.xp_reward);
+
+    const notificationService = new NotificationService();
+    await notificationService.notifyAchievementUnlocked({
+      userId,
+      userAchievementId: (ua as any).id,
+      achievement,
+    });
 
     return ua;
   }

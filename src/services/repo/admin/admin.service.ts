@@ -25,6 +25,7 @@ import type {
   UpdateSuperTournamentDto,
 } from "../../../dto/admin/admin-super-tournament.dto";
 import { PubgRegistrationField } from "../../../entities/PubgRegistrationField";
+import { NotificationService } from "../notification/notification.service";
 
 const SYSTEM_NOTIFICATIONS_CHANNEL = "SYSTEM_NOTIFICATIONS";
 const SUPER_TOURNAMENT_PREFIX = "[SUPER_TOURNAMENT]";
@@ -232,6 +233,35 @@ export class AdminService {
     await chatRepo.delete(channelId);
   }
 
+  async sendChannelMessage(channelId: number, senderId: number, content: string) {
+    const chatRepo = AppDataSource.getRepository(Chat);
+    const channel = await chatRepo.findOneBy({ id: channelId });
+    Ensure.exists(channel, "channel");
+
+    const messageRepo = AppDataSource.getRepository(Message);
+    const message = await messageRepo.save(
+      messageRepo.create({
+        chat: { id: channelId } as Chat,
+        sender: { id: senderId } as User,
+        content,
+      }),
+    );
+
+    const saved = await messageRepo.findOne({
+      where: { id: message.id },
+      relations: ["sender"],
+    });
+
+    return {
+      id: saved!.id,
+      content: saved!.content,
+      sender_id: saved!.sender?.id ?? senderId,
+      sender_name: saved!.sender?.gamer_name ?? saved!.sender?.full_name ?? "Admin",
+      created_at: saved!.created_at instanceof Date ? saved!.created_at.toISOString() : String(saved!.created_at),
+      channel_title: channel.title ?? "",
+    };
+  }
+
   private async getOrCreateNotificationsChannel(currentUserId: number) {
     const repo = AppDataSource.getRepository(Chat);
     let channel = await repo.findOne({
@@ -278,6 +308,8 @@ export class AdminService {
         title: parsed.title,
         description: parsed.description,
         type: parsed.type,
+        route: parsed.route,
+        action_label: parsed.action_label,
         created_at: message.created_at,
       };
     });
@@ -289,13 +321,18 @@ export class AdminService {
     const channel = await this.getOrCreateNotificationsChannel(currentUserId);
     const repo = AppDataSource.getRepository(Message);
 
-    return repo.save(
+    const saved = await repo.save(
       repo.create({
         chat: { id: channel.id } as Chat,
         sender: { id: currentUserId } as User,
         content: JSON.stringify(dto),
       }),
     );
+
+    const notificationService = new NotificationService();
+    await notificationService.notifyManualToUsers(dto);
+
+    return saved;
   }
 
   async deleteNotification(notificationId: number) {
@@ -407,6 +444,11 @@ export class AdminService {
       );
     }
 
+    if (dto.notify_all_users) {
+      const notificationService = new NotificationService();
+      await notificationService.notifyTournamentCreated(tournament.id, tournament.title);
+    }
+
     return tournament;
   }
 
@@ -493,18 +535,24 @@ function safeParseNotification(content: string) {
       title?: string;
       description?: string;
       type?: string;
+      route?: string;
+      action_label?: string;
     };
 
     return {
       title: parsed.title || "Untitled notification",
       description: parsed.description || "",
       type: parsed.type || "info",
+      route: parsed.route ?? "",
+      action_label: parsed.action_label ?? "",
     };
   } catch {
     return {
       title: "Untitled notification",
       description: content,
       type: "info",
+      route: "",
+      action_label: "",
     };
   }
 }

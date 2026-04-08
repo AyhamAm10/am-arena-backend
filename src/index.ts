@@ -2,8 +2,10 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import * as path from "path";
+import http from "http";
 import cookieParser from "cookie-parser";
 import qs from "qs";
+import { Server as SocketIOServer } from "socket.io";
 import { Environment } from "./environment";
 import { logger } from "./logging/logger";
 import { AppDataSource } from "./config/data_source";
@@ -23,8 +25,13 @@ import userRouter from "./routes/user.route";
 import heroContentRouter from "./routes/hero-content.route";
 import chatRouter from "./routes/chat.route";
 import adminRouter from "./routes/admin.route";
+import notificationRouter from "./routes/notification.route";
+// import { registerChatGateway } from "./socket/chat.gateway";
+import { setIO } from "./socket/io";
+import { registerChatGateway } from "./socket/chat.gateway";
 dotenv.config();
 const app = express();
+const httpServer = http.createServer(app);
 
 const corsOriginsEnv = process.env.CORS_ORIGINS?.trim();
 const corsOrigin =
@@ -89,12 +96,24 @@ router.use("/user", userRouter);
 router.use("/hero-content", heroContentRouter);
 router.use("/chat", chatRouter);
 router.use("/admin", adminRouter);
+router.use("/notification", notificationRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT) || 5000;
+
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: corsOrigin,
+    credentials: true,
+    methods: ["GET", "POST"],
+  },
+});
+
+setIO(io);
+registerChatGateway(io);
 
 swaggerDoc(app);
 
@@ -115,7 +134,7 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
         logger.error("Failed to create super admin:", error);
       }
 
-      app.listen(PORT, "0.0.0.0", () => {
+      httpServer.listen(PORT, "0.0.0.0", () => {
         logger.info(`Server running at http://localhost:${PORT}`);
       });
     })
@@ -124,4 +143,4 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
     });
 }
 
-export { app };
+export { app, io };

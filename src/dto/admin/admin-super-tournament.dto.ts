@@ -41,6 +41,7 @@ export const createSuperTournamentSchema = yup.object({
   end_date: yup.string().optional().nullable(),
   is_active: yup.boolean().optional().default(true),
   registration_fields: yup.array().of(registrationFieldSchema).optional().default([]),
+  notify_all_users: yup.boolean().optional().default(false),
 });
 
 export const updateSuperTournamentSchema = yup.object({

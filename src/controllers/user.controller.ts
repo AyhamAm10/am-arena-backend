@@ -126,9 +126,6 @@ export class UserController {
         req.body
       )) as ProfileUpdateDto;
 
-      console.log("FILE:", req.file);
-      console.log("BODY:", req.body);
-
       const profilePictureUrl = req.file
         ? imageUrl(req.file.filename)
         : undefined;

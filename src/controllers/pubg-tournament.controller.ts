@@ -1,4 +1,4 @@
-/**
+﻿/**
  * PUBG tournament creation (PubgTournamentService.createPubgTournament):
  *
  * Admin provides:
@@ -6,7 +6,7 @@
  * - PUBG game (PubgGame): type (solo/duo/squad), map; image via multipart field `image`
  * - Registration fields: label, type, options, required
  *
- * Flow: create pubg_game → tournament row (game_type = 'pubg', game_ref_id) → registration fields → chat.
+ * Flow: create pubg_game â†’ tournament row (game_type = 'pubg', game_ref_id) â†’ registration fields â†’ chat.
  */
 
 import { NextFunction, Request, Response } from "express";
@@ -34,6 +34,10 @@ function normalizeMultipartTournamentBody(body: Request["body"]) {
 
   if (typeof normalized.registration_fields === "string") {
     normalized.registration_fields = JSON.parse(normalized.registration_fields);
+  }
+
+  if (typeof normalized.notify_all_users === "string") {
+    normalized.notify_all_users = normalized.notify_all_users === "true";
   }
 
   return normalized;

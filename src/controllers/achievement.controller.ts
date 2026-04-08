@@ -20,6 +20,7 @@ export class AchievementController {
     this.getAchievements = this.getAchievements.bind(this);
     this.assignToUser = this.assignToUser.bind(this);
     this.toggleDisplay = this.toggleDisplay.bind(this);
+    this.getMyAchievements = this.getMyAchievements.bind(this);
   }
 
   async createAchievement(req: Request, res: Response, next: NextFunction) {
@@ -125,6 +126,26 @@ export class AchievementController {
         ApiResponse.success(
           result,
           ErrorMessages.generateErrorMessage("achievement", "created", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getMyAchievements(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      Ensure.exists(userId, "user");
+
+      const service = new UserAchievementService();
+      const data = await service.getMyAchievements(userId);
+
+      return res.json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage("achievements", "retrieved", lang)
         )
       );
     } catch (err) {
