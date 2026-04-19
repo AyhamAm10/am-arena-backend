@@ -5,6 +5,8 @@ import { ReelComment } from "../../../entities/ReelComment";
 import { ReelLike } from "../../../entities/ReelLike";
 import { RepoService } from "../../repo.service";
 import { GetReelsQueryDto } from "../../../dto/reel/get-reels-query.dto";
+import { HighlightService } from "../achievement/highlight.service";
+import { serializeUserAccount } from "../../../utils/serialize-user";
 
 export type ReelFeedItem = {
   id: number;
@@ -30,13 +32,25 @@ export class ReelService extends RepoService<Reel> {
     this.deleteReelByOwner = this.deleteReelByOwner.bind(this);
   }
 
-  async createReel(params: { title: string; video_url: string; description: string; userId: number }) {
-    return await this.create({
+  async createReel(params: {
+    title: string;
+    video_url: string;
+    description: string;
+    userId: number;
+    mentioned_user_ids?: number[];
+  }) {
+    const reel = await this.create({
       title: params.title,
       video_url: params.video_url,
       description: params.description,
       user: { id: params.userId } as any,
     } as any);
+    await new HighlightService().syncReelHighlights({
+      reelId: reel.id,
+      mentionedUserIds: params.mentioned_user_ids ?? [],
+      actorUserId: params.userId,
+    });
+    return reel;
   }
 
   async getReels(query: GetReelsQueryDto) {
@@ -88,8 +102,11 @@ export class ReelService extends RepoService<Reel> {
         description: r.description,
         created_at: r.created_at,
         updated_at: r.updated_at,
-        user: r.user,
-        comments,
+        user: r.user ? serializeUserAccount(r.user as any) : r.user,
+        comments: comments.map((comment: any) => ({
+          ...comment,
+          user: comment.user ? serializeUserAccount(comment.user as any) : comment.user,
+        })),
         likes_count: r.likesCount ?? 0,
         comments_count: comments.length,
         liked_by_current_user: likedIds.has(r.id),
@@ -113,14 +130,22 @@ export class ReelService extends RepoService<Reel> {
   async updateReelByOwner(
     reelId: number,
     userId: number,
-    params: { title?: string; description?: string; video_url?: string }
+    params: { title?: string; description?: string; video_url?: string; mentioned_user_ids?: number[] }
   ) {
     await this.assertReelOwnedByUser(reelId, userId);
     const patch: Record<string, unknown> = {};
     if (params.title !== undefined) patch.title = params.title;
     if (params.description !== undefined) patch.description = params.description;
     if (params.video_url !== undefined) patch.video_url = params.video_url;
-    return await this.update(reelId, patch as any);
+    const updated = await this.update(reelId, patch as any);
+    if (params.mentioned_user_ids !== undefined) {
+      await new HighlightService().syncReelHighlights({
+        reelId,
+        mentionedUserIds: params.mentioned_user_ids,
+        actorUserId: userId,
+      });
+    }
+    return updated;
   }
 
   async deleteReelByOwner(reelId: number, userId: number) {

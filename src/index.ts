@@ -26,6 +26,7 @@ import heroContentRouter from "./routes/hero-content.route";
 import chatRouter from "./routes/chat.route";
 import adminRouter from "./routes/admin.route";
 import notificationRouter from "./routes/notification.route";
+import pollRouter from "./routes/poll.route";
 // import { registerChatGateway } from "./socket/chat.gateway";
 import { setIO } from "./socket/io";
 import { registerChatGateway } from "./socket/chat.gateway";
@@ -97,6 +98,7 @@ router.use("/hero-content", heroContentRouter);
 router.use("/chat", chatRouter);
 router.use("/admin", adminRouter);
 router.use("/notification", notificationRouter);
+router.use("/poll", pollRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 

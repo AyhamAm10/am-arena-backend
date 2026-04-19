@@ -3,6 +3,7 @@ import { Friend, FriendStatus } from "../../../entities/Friend";
 import { RepoService } from "../../repo.service";
 import { GetFriendsQueryDto } from "../../../dto/friend/get-friends-query.dto";
 import { NotificationService } from "../notification/notification.service";
+import { serializeUserAccount } from "../../../utils/serialize-user";
 
 export class FriendService extends RepoService<Friend> {
   constructor() {
@@ -86,7 +87,16 @@ export class FriendService extends RepoService<Friend> {
       .take(limit)
       .getManyAndCount();
 
-    return { data, total, page, limit };
+    return {
+      data: data.map((row) => ({
+        ...row,
+        user: row.user ? serializeUserAccount(row.user as any) : undefined,
+        friend: row.friend ? serializeUserAccount(row.friend as any) : undefined,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async removeFriendship(currentUserId: number, friendUserId: number) {

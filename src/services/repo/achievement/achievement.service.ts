@@ -7,6 +7,7 @@ import { GetAchievementsQueryDto } from "../../../dto/achievement/get-achievemen
 import { UserAchievementService } from "../user-achievement/user-achievement.service";
 import { UserService } from "../user/user.service";
 import { NotificationService } from "../notification/notification.service";
+import { AchievementProgressService } from "./achievement-progress.service";
 
 type CreateAchievementParams = CreateAchievementDto & { icon_url?: string };
 
@@ -24,23 +25,38 @@ export class AchievementService extends RepoService<Achievement> {
     Ensure.required(params.name, "name");
     Ensure.required(params.description, "description");
     Ensure.required(params.icon_url, "icon_url");
+    Ensure.custom(
+      params.logic_type !== "progress" || (params.target != null && Number(params.target) > 0),
+      "Progress achievements require a target",
+    );
     return await this.create({
       name: params.name,
       description: params.description,
       color_theme: params.color_theme ?? null,
       icon_url: params.icon_url,
       xp_reward: params.xp_reward ?? 0,
+      type: params.type,
+      logic_type: params.logic_type,
+      target: params.target ?? null,
     } as any);
   }
 
   async updateAchievement(id: string | number, params: UpdateAchievementDto) {
-    await this.getById(id);
+    const current = (await this.getById(id)) as Achievement;
     const data: any = {};
     if (params.name !== undefined) data.name = params.name;
     if (params.description !== undefined) data.description = params.description;
     if (params.color_theme !== undefined) data.color_theme = params.color_theme;
     if (params.icon_url !== undefined) data.icon_url = params.icon_url;
     if (params.xp_reward !== undefined) data.xp_reward = params.xp_reward;
+    if (params.type !== undefined) data.type = params.type;
+    if (params.logic_type !== undefined) data.logic_type = params.logic_type;
+    if (params.target !== undefined) data.target = params.target ?? null;
+    const nextLogicType = params.logic_type ?? current.logic_type;
+    if (nextLogicType === "progress") {
+      const target = params.target !== undefined ? params.target : current.target ?? null;
+      Ensure.custom(target != null && Number(target) > 0, "Progress achievements require a target");
+    }
     if (Object.keys(data).length === 0) return await this.getById(id);
     return await this.update(id, data);
   }
@@ -50,6 +66,7 @@ export class AchievementService extends RepoService<Achievement> {
   }
 
   async getAchievements(query: GetAchievementsQueryDto) {
+    const viewerUserId = query.user_id ? Number(query.user_id) : null;
     const { name, page = 1, limit = 10 } = query;
     if (name?.trim()) {
       const qb = this.repo.createQueryBuilder("a").where("a.name ILIKE :name", { name: `%${name.trim()}%` });
@@ -58,9 +75,18 @@ export class AchievementService extends RepoService<Achievement> {
         .skip((page - 1) * limit)
         .take(limit)
         .getManyAndCount();
-      return { data, total, page, limit };
+      return {
+        data: await this.decorateAchievementsForUser(data, viewerUserId),
+        total,
+        page,
+        limit,
+      };
     }
-    return await this.getAllWithPagination({ page, limit });
+    const result = await this.getAllWithPagination({ page, limit, order: { created_at: "DESC" } as any });
+    return {
+      ...result,
+      data: await this.decorateAchievementsForUser(result.data, viewerUserId),
+    };
   }
 
   async assignToUser(achievementId: string | number, userId: number) {
@@ -89,5 +115,43 @@ export class AchievementService extends RepoService<Achievement> {
     });
 
     return ua;
+  }
+
+  private async decorateAchievementsForUser(
+    achievements: Achievement[],
+    userId: number | null,
+  ) {
+    if (userId == null || achievements.length === 0) {
+      return achievements.map((achievement) => ({
+        ...achievement,
+        current: 0,
+        target: achievement.target ?? null,
+        percentage: 0,
+        is_obtained: false,
+        displayed: false,
+      }));
+    }
+
+    const userAchievementService = new UserAchievementService();
+    const progressService = new AchievementProgressService();
+    const [userAchievements, stats] = await Promise.all([
+      userAchievementService.getMyAchievements(userId),
+      progressService.aggregateUserStats(userId),
+    ]);
+    const byAchievementId = new Map(
+      userAchievements
+        .filter((item) => item.achievement)
+        .map((item) => [item.achievement.id, item]),
+    );
+
+    return achievements.map((achievement) => {
+      const row = byAchievementId.get(achievement.id);
+      const progress = progressService.getProgress(achievement, stats, Boolean(row));
+      return {
+        ...achievement,
+        ...progress,
+        displayed: row?.displayed ?? false,
+      };
+    });
   }
 }

@@ -3,18 +3,42 @@ import { ErrorMessages } from "../../../common/errors/ErrorMessages";
 import { getLanguage } from "../../../middlewares/lang.middleware";
 import { ILike, In, Not } from "typeorm";
 import { AppDataSource } from "../../../config/data_source";
-import { Friend, FriendStatus } from "../../../entities/Friend";
+import { Friend } from "../../../entities/Friend";
 import { PubgRegistration } from "../../../entities/PubgRegistration";
 import { Tournament } from "../../../entities/Tournament";
 import { User } from "../../../entities/User";
+import { Achievement } from "../../../entities/Achievement";
 import { RepoService } from "../../repo.service";
 import { GetBestUsersQueryDto } from "../../../dto/user/get-best-users-query.dto";
 import { SearchUsersQueryDto } from "../../../dto/user/search-users-query.dto";
 import { ProfileUpdateDto } from "../../../dto/user/update-profile.dto";
+import { AchievementProgressService } from "../achievement/achievement-progress.service";
+import { CloudinaryService } from "../../cloudinary.service";
+import {
+  serializeAvatarFields,
+  serializeUserAccount,
+} from "../../../utils/serialize-user";
 
-const LATEST_WON_TOURNAMENTS_LIMIT = 10;
-const TOURNAMENT_HISTORY_LIMIT = 20;
+const PROFILE_WON_TOURNAMENTS_LIMIT = 3;
+const TOURNAMENT_HISTORY_LIMIT = 3;
 const BEST_USER_RELATIONS = ["achievements", "achievements.achievement", "wonTournaments"] as const;
+
+type FriendStatusValue = "accepted" | "pending" | "blocked" | null;
+
+function serializeAchievement(achievement: Achievement | null | undefined) {
+  if (!achievement) return null;
+  return {
+    id: achievement.id,
+    name: achievement.name,
+    description: achievement.description,
+    color_theme: achievement.color_theme,
+    icon_url: achievement.icon_url,
+    xp_reward: achievement.xp_reward,
+    type: achievement.type,
+    logic_type: achievement.logic_type,
+    target: achievement.target ?? null,
+  };
+}
 
 export class UserService extends RepoService<User> {
   constructor() {
@@ -27,6 +51,7 @@ export class UserService extends RepoService<User> {
     this.setExpoPushToken = this.setExpoPushToken.bind(this);
     this.getActiveUserIdsPage = this.getActiveUserIdsPage.bind(this);
     this.findPushTokensForUserIds = this.findPushTokensForUserIds.bind(this);
+    this.setSelectedAchievement = this.setSelectedAchievement.bind(this);
   }
 
   async setExpoPushToken(userId: number, token: string | null) {
@@ -77,6 +102,15 @@ export class UserService extends RepoService<User> {
     await this.repo.update(userId, { xp_points: currentXp + amount } as any);
   }
 
+  async setSelectedAchievement(userId: number, achievementId: number | null) {
+    const payload =
+      achievementId == null
+        ? ({ selected_achievement: null } as any)
+        : ({ selected_achievement: { id: achievementId } as Achievement } as any);
+    await this.repo.update(userId, payload);
+    return this.getUserProfile(userId);
+  }
+
   async getBestUsers(query: GetBestUsersQueryDto) {
     const { data, total, page, limit } = await this.getAllWithPagination({
       page: query.page,
@@ -90,7 +124,7 @@ export class UserService extends RepoService<User> {
         id: user.id,
         full_name: user.full_name,
         gamer_name: user.gamer_name,
-        profile_picture_url: user.profile_picture_url,
+        ...serializeAvatarFields(user),
         xp_points: user.xp_points,
         coins: user.coins,
         role: user.role,
@@ -145,6 +179,7 @@ export class UserService extends RepoService<User> {
         full_name: true,
         gamer_name: true,
         profile_picture_url: true,
+        avatar_public_id: true,
         xp_points: true,
         coins: true,
         role: true,
@@ -176,7 +211,7 @@ export class UserService extends RepoService<User> {
     }
 
     const enriched = data.map((u: any) => ({
-      ...u,
+      ...serializeUserAccount(u),
       friend_status: friendMap.get(u.id) ?? null,
     }));
 
@@ -186,7 +221,12 @@ export class UserService extends RepoService<User> {
   async getUserProfile(userId: number, requestingUserId?: number) {
     const user = await this.repo.findOne({
       where: { id: userId },
-      relations: ["achievements", "achievements.achievement", "wonTournaments"],
+      relations: [
+        "achievements",
+        "achievements.achievement",
+        "wonTournaments",
+        "selected_achievement",
+      ],
     });
     Ensure.exists(user, "user");
 
@@ -194,7 +234,10 @@ export class UserService extends RepoService<User> {
       (a, b) =>
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
-    const won_tournaments = wonSorted.slice(0, LATEST_WON_TOURNAMENTS_LIMIT);
+    const won_tournaments = wonSorted.slice(0, PROFILE_WON_TOURNAMENTS_LIMIT);
+
+    const achievementProgressService = new AchievementProgressService();
+    const progressStats = await achievementProgressService.aggregateUserStats(userId);
 
     const achievements = (user.achievements ?? [])
       .filter((ua) => ua.displayed === true)
@@ -202,7 +245,12 @@ export class UserService extends RepoService<User> {
         id: ua.id,
         obtained_at: ua.obtained_at,
         displayed: ua.displayed,
-        achievement: ua.achievement ?? null,
+        achievement: ua.achievement
+          ? {
+              ...serializeAchievement(ua.achievement as Achievement),
+              ...achievementProgressService.getProgress(ua.achievement as any, progressStats, true),
+            }
+          : null,
       }));
 
     const regRepo = AppDataSource.getRepository(PubgRegistration);
@@ -251,21 +299,58 @@ export class UserService extends RepoService<User> {
       };
     });
 
+    let friend_status: FriendStatusValue = null;
+    const viewerId =
+      requestingUserId != null ? Number(requestingUserId) : NaN;
+    if (
+      Number.isFinite(viewerId) &&
+      viewerId > 0 &&
+      viewerId !== userId
+    ) {
+      const friendRepo = AppDataSource.getRepository(Friend);
+      // Composite PK: avoid `select: ["status"]` only — TypeORM needs PK columns;
+      // mirror FriendService with two directional lookups.
+      const friendRow =
+        (await friendRepo.findOne({
+          where: { user_id: viewerId, friend_user_id: userId },
+        })) ??
+        (await friendRepo.findOne({
+          where: { user_id: userId, friend_user_id: viewerId },
+        }));
+      if (friendRow?.status != null) {
+        friend_status = friendRow.status as FriendStatusValue;
+      }
+    }
+
+    const titles_count = user.achievements?.length ?? 0;
+    const tournaments_participated_count = progressStats.tournament_join;
+
     const publicUser = {
       id: user.id,
       full_name: user.full_name,
       gamer_name: user.gamer_name,
-      profile_picture_url: user.profile_picture_url,
+      ...serializeAvatarFields(user),
       xp_points: user.xp_points,
       coins: user.coins,
       role: user.role,
       is_active: user.is_active,
       created_at: user.created_at,
       updated_at: user.updated_at,
+      selected_achievement: user.selected_achievement
+        ? {
+            ...serializeAchievement(user.selected_achievement),
+            ...achievementProgressService.getProgress(user.selected_achievement, progressStats, true),
+          }
+        : null,
+      friend_status,
     };
 
     return {
       user: publicUser,
+      stats: {
+        titles_count,
+        tournaments_participated_count,
+      },
       achievements,
       won_tournaments,
       tournament_history,
@@ -274,15 +359,19 @@ export class UserService extends RepoService<User> {
 
   async updateProfile(
     userId: number,
-    dto: ProfileUpdateDto,
-    profilePictureUrl?: string
+    dto: ProfileUpdateDto
   ) {
     Ensure.isNumber(userId, "user");
 
     const payload: Partial<
       Pick<
         User,
-        "full_name" | "gamer_name" | "email" | "phone" | "profile_picture_url"
+        | "full_name"
+        | "gamer_name"
+        | "email"
+        | "phone"
+        | "profile_picture_url"
+        | "avatar_public_id"
       >
     > = {};
 
@@ -290,8 +379,9 @@ export class UserService extends RepoService<User> {
     if (dto.gamer_name !== undefined) payload.gamer_name = dto.gamer_name;
     if (dto.email !== undefined) payload.email = dto.email;
     if (dto.phone !== undefined) payload.phone = dto.phone;
-    if (profilePictureUrl !== undefined) {
-      payload.profile_picture_url = profilePictureUrl;
+    if (dto.avatarUrl !== undefined) {
+      payload.profile_picture_url = dto.avatarUrl ?? null;
+      payload.avatar_public_id = dto.avatarPublicId ?? null;
     }
 
     Ensure.custom(
@@ -313,6 +403,25 @@ export class UserService extends RepoService<User> {
         select: ["id"],
       });
       Ensure.alreadyExists(!!(taken && taken.id !== userId), "phone");
+    }
+
+    const currentUser =
+      dto.avatarUrl !== undefined
+        ? await this.repo.findOne({
+            where: { id: userId },
+            select: ["id", "avatar_public_id"],
+          })
+        : null;
+    Ensure.exists(currentUser || dto.avatarUrl === undefined, "user");
+
+    const currentAvatarPublicId = currentUser?.avatar_public_id?.trim() || null;
+    const nextAvatarPublicId = payload.avatar_public_id?.trim() || null;
+    if (
+      currentAvatarPublicId &&
+      currentAvatarPublicId !== nextAvatarPublicId
+    ) {
+      const cloudinaryService = new CloudinaryService();
+      await cloudinaryService.destroyImage(currentAvatarPublicId);
     }
 
     await this.repo.update(userId, payload as any);

@@ -20,7 +20,6 @@ import {
   profileUpdateSchema,
 } from "../dto/user/update-profile.dto";
 import { UserService } from "../services/repo/user/user.service";
-import { imageUrl } from "../utils/handle-generate-url";
 export class UserController {
   constructor() {
     this.getBestUsers = this.getBestUsers.bind(this);
@@ -126,14 +125,10 @@ export class UserController {
         req.body
       )) as ProfileUpdateDto;
 
-      const profilePictureUrl = req.file
-        ? imageUrl(req.file.filename)
-        : undefined;
       const userService = new UserService();
       const profile = await userService.updateProfile(
         userId as number,
-        dto,
-        profilePictureUrl
+        dto
       );
 
       return res.json(

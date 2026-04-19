@@ -6,9 +6,9 @@ import { ErrorMessages } from "../common/errors/ErrorMessages";
 import { validator } from "../common/errors/validator";
 import { AuthRegisterDto, authRegisterSchema } from "../dto/auth/auth-register.dto";
 import { AuthService } from "../services/repo/auth/auth.service";
-import { imageUrl } from "../utils/handle-generate-url";
 import { AuthLoginDto, authLoginSchema } from "../dto/auth/auth-login.dto";
 import { AuthRefreshDto, authRefreshSchema } from "../dto/auth/auth-refresh.dto";
+import { serializeUserAccount } from "../utils/serialize-user";
 
 export class AuthController {
   constructor() {
@@ -27,18 +27,14 @@ export class AuthController {
       const dto = req.body as AuthRegisterDto;
       const authService = new AuthService();
 
-      let image: string | undefined = undefined;
-      if (req.file) {
-        image = imageUrl(req.file.filename);
-      }
-
       const { user, accessToken, refreshToken } = await authService.register({
         email: dto.email,
         full_name: dto.full_name,
         password: dto.password,
         phone: dto.phone,
         gamer_name: dto.gamer_name,
-        profile_picture_url: image,
+        avatarUrl: dto.avatarUrl ?? undefined,
+        avatarPublicId: dto.avatarPublicId ?? undefined,
       });
 
       res.cookie("refreshToken", refreshToken, {
@@ -50,7 +46,11 @@ export class AuthController {
 
       return res.status(HttpStatusCode.CREATED).json(
         ApiResponse.success(
-          { user, accessToken, refreshToken },
+          {
+            user: serializeUserAccount(user as any),
+            accessToken,
+            refreshToken,
+          },
           ErrorMessages.generateErrorMessage("user", "created", lang)
         )
       );
@@ -82,7 +82,11 @@ export class AuthController {
 
       return res.json(
         ApiResponse.success(
-          { user, accessToken, refreshToken },
+          {
+            user: serializeUserAccount(user as any),
+            accessToken,
+            refreshToken,
+          },
           ErrorMessages.generateErrorMessage("user", "logged in", lang)
         )
       );
@@ -145,6 +149,7 @@ export class AuthController {
         "achievements",
         "achievements.achievement",
         "friends",
+        "selected_achievement",
       ]);
 
       if (!user) {
@@ -158,7 +163,7 @@ export class AuthController {
 
       return res.json(
         ApiResponse.success(
-          userInfo,
+          serializeUserAccount(userInfo as any),
           ErrorMessages.generateErrorMessage("user", "retrieved", lang)
         )
       );

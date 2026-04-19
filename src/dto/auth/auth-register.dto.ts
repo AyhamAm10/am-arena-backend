@@ -8,7 +8,8 @@ export const authRegisterSchema = yup.object({
     .min(6, "Password must be at least 6 characters")
     .required("Password is required"),
   phone: yup.string().optional(),
-  profile_picture_url: yup.string().url("Invalid URL format").optional(),
+  avatarUrl: yup.string().url("Invalid URL format").optional().nullable(),
+  avatarPublicId: yup.string().optional().nullable(),
 });
 
 export type AuthRegisterDto = yup.InferType<typeof authRegisterSchema>;

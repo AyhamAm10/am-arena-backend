@@ -8,6 +8,7 @@ import { CreateAchievementDto, createAchievementSchema } from "../dto/achievemen
 import { UpdateAchievementDto, updateAchievementSchema } from "../dto/achievement/update-achievement.dto";
 import { GetAchievementsQueryDto, getAchievementsQuerySchema } from "../dto/achievement/get-achievements-query.dto";
 import { AssignAchievementDto, assignAchievementSchema } from "../dto/achievement/assign-achievement.dto";
+import { SetActiveAchievementDto, setActiveAchievementSchema } from "../dto/achievement/set-active-achievement.dto";
 import { AchievementService } from "../services/repo/achievement/achievement.service";
 import { UserAchievementService } from "../services/repo/user-achievement/user-achievement.service";
 import { Ensure } from "../common/errors/Ensure.handler";
@@ -21,6 +22,7 @@ export class AchievementController {
     this.assignToUser = this.assignToUser.bind(this);
     this.toggleDisplay = this.toggleDisplay.bind(this);
     this.getMyAchievements = this.getMyAchievements.bind(this);
+    this.setActiveAchievement = this.setActiveAchievement.bind(this);
   }
 
   async createAchievement(req: Request, res: Response, next: NextFunction) {
@@ -95,10 +97,14 @@ export class AchievementController {
   async getAchievements(req: Request, res: Response, next: NextFunction) {
     try {
       const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
       const dto = (await validator(getAchievementsQuerySchema, req.query)) as GetAchievementsQueryDto;
 
       const achievementService = new AchievementService();
-      const { data, total, page, limit } = await achievementService.getAchievements(dto);
+      const { data, total, page, limit } = await achievementService.getAchievements({
+        ...dto,
+        user_id: userId,
+      });
 
       return res.json(
         ApiResponse.success(data, ErrorMessages.generateErrorMessage("achievements", "retrieved", lang), {
@@ -163,6 +169,28 @@ export class AchievementController {
 
       const service = new UserAchievementService();
       const result = await service.toggleDisplayed(id, userId);
+
+      return res.json(
+        ApiResponse.success(
+          result,
+          ErrorMessages.generateErrorMessage("achievement", "updated", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async setActiveAchievement(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      Ensure.exists(userId, "user");
+      await validator(setActiveAchievementSchema, req.body);
+      const dto = req.body as SetActiveAchievementDto;
+
+      const service = new UserAchievementService();
+      const result = await service.setActiveAchievement(dto.user_achievement_id, userId);
 
       return res.json(
         ApiResponse.success(

@@ -42,5 +42,10 @@ achievementRouter.patch(
   authMiddleware,
   achievementController.toggleDisplay
 );
+achievementRouter.patch(
+  "/user-achievement/active",
+  authMiddleware,
+  achievementController.setActiveAchievement
+);
 
 export default achievementRouter;

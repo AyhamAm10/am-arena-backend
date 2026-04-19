@@ -26,9 +26,13 @@ import type {
 } from "../../../dto/admin/admin-super-tournament.dto";
 import { PubgRegistrationField } from "../../../entities/PubgRegistrationField";
 import { NotificationService } from "../notification/notification.service";
+import { HighlightService } from "../achievement/highlight.service";
+import {
+  decodeSuperTournamentDescription,
+  encodeSuperTournamentDescription,
+} from "../../../common/utils/super-tournament-description";
 
 const SYSTEM_NOTIFICATIONS_CHANNEL = "SYSTEM_NOTIFICATIONS";
-const SUPER_TOURNAMENT_PREFIX = "[SUPER_TOURNAMENT]";
 
 export class AdminService {
   async getUsers(query: GetAdminUsersQueryDto) {
@@ -349,12 +353,26 @@ export class AdminService {
     await repo.delete(notificationId);
   }
 
-  async updateReelAsAdmin(reelId: number, payload: Partial<Pick<Reel, "title" | "description" | "video_url">>) {
+  async updateReelAsAdmin(
+    reelId: number,
+    payload: Partial<Pick<Reel, "title" | "description" | "video_url">> & {
+      mentioned_user_ids?: number[];
+      actorUserId?: number;
+    }
+  ) {
     const repo = AppDataSource.getRepository(Reel);
     const reel = await repo.findOneBy({ id: reelId });
     Ensure.exists(reel, "reel");
     Object.assign(reel, payload);
-    return repo.save(reel);
+    const saved = await repo.save(reel);
+    if (payload.mentioned_user_ids !== undefined && payload.actorUserId != null) {
+      await new HighlightService().syncReelHighlights({
+        reelId,
+        mentionedUserIds: payload.mentioned_user_ids,
+        actorUserId: payload.actorUserId,
+      });
+    }
+    return saved;
   }
 
   async deleteReelAsAdmin(reelId: number) {
@@ -426,6 +444,8 @@ export class AdminService {
         start_date: dto.start_date ? new Date(dto.start_date) : null,
         end_date: dto.end_date ? new Date(dto.end_date) : null,
         is_active: dto.is_active ?? true,
+        is_super: true,
+        Xp_condition: dto.min_xp_required ?? 0,
         created_by: { id: currentUserId } as User,
       }),
     );
@@ -489,6 +509,8 @@ export class AdminService {
       dto.description ?? decoded.description,
       dto.min_xp_required ?? decoded.min_xp_required,
     );
+    tournament.is_super = true;
+    tournament.Xp_condition = dto.min_xp_required ?? decoded.min_xp_required;
 
     await tournamentRepo.save(tournament);
 
@@ -555,25 +577,4 @@ function safeParseNotification(content: string) {
       action_label: "",
     };
   }
-}
-
-function encodeSuperTournamentDescription(description: string, minXpRequired: number) {
-  return `${SUPER_TOURNAMENT_PREFIX}${minXpRequired}\n${description}`;
-}
-
-function decodeSuperTournamentDescription(value: string) {
-  if (!value.startsWith(SUPER_TOURNAMENT_PREFIX)) {
-    return {
-      description: value,
-      min_xp_required: 0,
-    };
-  }
-
-  const [header, ...descriptionLines] = value.split("\n");
-  const minXp = Number(header.replace(SUPER_TOURNAMENT_PREFIX, "")) || 0;
-
-  return {
-    description: descriptionLines.join("\n"),
-    min_xp_required: minXp,
-  };
 }

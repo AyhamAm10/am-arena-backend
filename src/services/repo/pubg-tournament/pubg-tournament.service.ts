@@ -1,5 +1,7 @@
 import { Ensure } from "../../../common/errors/Ensure.handler";
+import { decodeSuperTournamentDescription } from "../../../common/utils/super-tournament-description";
 import { Tournament } from "../../../entities/Tournament";
+import { User } from "../../../entities/User";
 import { Chat, ChatType } from "../../../entities/Chat";
 import { RepoService } from "../../repo.service";
 import { CreatePubgTournamentDto } from "../../../dto/pubg-tournament/create-pubg-tournament.dto";
@@ -13,11 +15,19 @@ import { ChatService } from "../chat/chat.service";
 import { ChatMemberService } from "../chat-member/chat-member.service";
 import { UserService } from "../user/user.service";
 import { NotificationService } from "../notification/notification.service";
+import { PollService } from "../poll/poll.service";
 import { PubgType } from "../../../entities/PubgGame";
 import { AppDataSource } from "../../../config/data_source";
 import { In } from "typeorm";
 type CreatePubgTournamentParams = CreatePubgTournamentDto & { createdById: number; image: string };
 type UpdatePubgTournamentParams = UpdatePubgTournamentDto;
+
+function safeTournamentWinnerSummaries(
+  winners: User[] | undefined
+): { id: number; gamer_name: string }[] {
+  if (!Array.isArray(winners)) return [];
+  return winners.map((w) => ({ id: w.id, gamer_name: w.gamer_name }));
+}
 
 export class PubgTournamentService extends RepoService<Tournament> {
   constructor() {
@@ -152,42 +162,74 @@ export class PubgTournamentService extends RepoService<Tournament> {
     const game = await pubgService.getById(tournament.game_ref_id);
 
     const registrationFields = await this.getRegistrationFields(tournament.id);
+    const pollService = new PollService();
+    const polls = await pollService.getTournamentPolls(tournament.id);
     return {
       ...tournament,
       game,
       registration_fields: registrationFields,
+      polls,
     };
   }
 
   async getPubgTournaments(options: GetPubgTournamentsQueryDto) {
-    const { page = 1, limit = 10, is_active } = options;
+    const { page = 1, limit = 10, is_active, is_super } = options;
     const where: any = {};
     if (is_active !== undefined && is_active !== null) {
       where.is_active = is_active;
     }
-    const data = await this.getAllWithPagination({ page, limit, where });
+    if (is_super !== undefined && is_super !== null) {
+      where.is_super = is_super;
+    }
+
+    const loadWinners = is_active === false;
+    const order =
+      is_active === false
+        ? ({ updated_at: "DESC" } as const)
+        : ({ start_date: "ASC", id: "DESC" } as const);
+
+    const data = await this.getAllWithPagination({
+      page,
+      limit,
+      where,
+      relations: loadWinners ? (["winners"] as any) : undefined,
+      order: order as any,
+    });
 
     const pubgService = new PubgService();
 
     const pubgRegistrationService = new PubgRegistrationService();
 
-    data.data = await Promise.all(
+    const rows = await Promise.all(
       data.data.map(async (tournament: Tournament) => {
         const game = await pubgService.getById(tournament.game_ref_id);
         const registrationFields = await this.getRegistrationFields(tournament.id);
         const registered_count = await pubgRegistrationService.countByTournamentId(
           tournament.id
         );
-        return {
+
+        const result: Record<string, unknown> = {
           ...tournament,
           registration_fields: registrationFields,
           game,
           registered_count,
         };
+        delete result.winners;
+        result.winners = safeTournamentWinnerSummaries(
+          (tournament as Tournament & { winners?: User[] }).winners
+        );
+
+        if (tournament.is_super && tournament.description) {
+          const decoded = decodeSuperTournamentDescription(tournament.description);
+          result.description = decoded.description;
+          result.min_xp_required = decoded.min_xp_required;
+        }
+
+        return result;
       })
     );
 
-    return data;
+    return { ...data, data: rows };
   }
 
   async getRegistrationFields(tournamentId: string | number) {
@@ -233,6 +275,20 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
     const user = await userService.findOneByCondition({ id: userId } as any);
     Ensure.exists(user, "user");
+
+    let xpRequired = Math.max(0, Math.trunc(Number(tournament.Xp_condition) || 0));
+    if (tournament.is_super && typeof tournament.description === "string") {
+      const { min_xp_required } = decodeSuperTournamentDescription(tournament.description);
+      xpRequired = Math.max(xpRequired, Math.max(0, Math.trunc(Number(min_xp_required) || 0)));
+    }
+    if (xpRequired > 0) {
+      const userXp = Math.max(0, Math.trunc(Number(user!.xp_points) || 0));
+      Ensure.custom(
+        userXp >= xpRequired,
+        `Insufficient XP to join this tournament (required ${xpRequired} XP, you have ${userXp})`
+      );
+    }
+
     const entryFee = Number(tournament.entry_fee) || 0;
     if (entryFee > 0) {
       Ensure.custom(

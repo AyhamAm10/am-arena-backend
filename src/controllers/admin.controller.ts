@@ -303,9 +303,12 @@ export class AdminController {
       const lang = (req.headers["accept-language"] as Language) || "en";
       const params = await validator(adminIdParamsSchema, req.params);
       const dto = await validator(updateReelSchema, req.body);
+      const currentUserId = req.currentUser;
+      Ensure.exists(currentUserId, "user");
       const result = await this.adminService.updateReelAsAdmin(params.id, {
         ...dto,
         ...(req.reelVideoUrl ? { video_url: req.reelVideoUrl } : {}),
+        actorUserId: currentUserId,
       });
 
       return res.json(

@@ -1,6 +1,19 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm";
 import { UserAchievement } from "./UserAchievement";
 
+
+export enum AchievementType {
+  TOURNAMENT_JOIN = 'tournament_join',
+  TOURNAMENT_WIN = 'tournament_win',
+  TOURNAMENT_RANK = 'tournament_rank',
+  POLL_PARTICIPATION = 'poll_participation',
+  POLL_WIN = 'poll_win',
+  HIGHLIGHT = 'highlight',
+  CUSTOM = 'custom',
+  EVENT_SPECIAL = 'event_special'
+}
+
+
 @Entity({ name: "achievements" })
 export class Achievement {
   @PrimaryGeneratedColumn()
@@ -20,6 +33,22 @@ export class Achievement {
 
   @Column({ type: "int", default: 0 })
   xp_reward: number;
+
+  @Column({ default: false })
+  repeatable: boolean;
+
+  @Column({
+    type: 'enum',
+    enum: AchievementType,
+    default: AchievementType.CUSTOM
+  })
+  type: AchievementType;
+
+  @Column({ type: "enum", enum: ["progress", "event", "manual"], default: "manual" })
+  logic_type: "progress" | "event" | "manual";
+
+  @Column({ type: "int", nullable: true })
+  target: number | null;
 
   @CreateDateColumn()
   created_at: Date;

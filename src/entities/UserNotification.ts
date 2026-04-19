@@ -13,8 +13,10 @@ export type AppNotificationType =
   | "CHAT_MESSAGE"
   | "TOURNAMENT_CREATED"
   | "ACHIEVEMENT_UNLOCKED"
+  | "REEL_HIGHLIGHT"
   | "SYSTEM_MESSAGE"
-  | "MANUAL";
+  | "MANUAL"
+  | "GLOBAL_POLL";
 
 @Entity("user_notifications")
 export class UserNotification {

@@ -11,6 +11,14 @@ export const getPubgTournamentsQuerySchema = yup.object({
       return undefined;
     })
     .optional(),
+  is_super: yup
+    .boolean()
+    .transform((v) => {
+      if (v === "true" || v === true) return true;
+      if (v === "false" || v === false) return false;
+      return undefined;
+    })
+    .optional(),
 });
 
 export type GetPubgTournamentsQueryDto = yup.InferType<typeof getPubgTournamentsQuerySchema>;

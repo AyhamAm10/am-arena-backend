@@ -9,7 +9,10 @@ import { ErrorMessages } from "../../../common/errors/ErrorMessages";
 import { AuthRegisterDto } from "../../../dto/auth/auth-register.dto";
 import { AuthLoginDto } from "../../../dto/auth/auth-login.dto";
 
-type RegisterParams = Pick<AuthRegisterDto, "email" | "password" | "full_name" | "gamer_name" | "phone" | "profile_picture_url">;
+type RegisterParams = Pick<
+  AuthRegisterDto,
+  "email" | "password" | "full_name" | "gamer_name" | "phone" | "avatarUrl" | "avatarPublicId"
+>;
 type LoginParams = Pick<AuthLoginDto, "email" | "password">;
 
 export class AuthService extends RepoService<User> {
@@ -44,7 +47,7 @@ export class AuthService extends RepoService<User> {
   }
 
   async register(params: RegisterParams) {
-    const { full_name , gamer_name , phone , profile_picture_url , email, password } = params;
+    const { full_name , gamer_name , phone , avatarUrl , avatarPublicId , email, password } = params;
     const currentLang = getLanguage();
     
     const existingUser = await this.findOneByCondition({ email });
@@ -59,7 +62,8 @@ export class AuthService extends RepoService<User> {
       full_name , 
       gamer_name,
       phone,
-      profile_picture_url
+      profile_picture_url: avatarUrl,
+      avatar_public_id: avatarPublicId
     });
 
     const tokens = JwtService.generateTokens({
@@ -81,7 +85,7 @@ export class AuthService extends RepoService<User> {
     // Find user with password field included
     const user = await this.repo.findOne({ 
       where: { email },
-      select: ['id', 'achievements', "password_hash", 'email', 'coins', 'role', 'full_name', 'gamer_name', 'is_active']
+      select: ['id', 'achievements', "password_hash", 'email', 'coins', 'role', 'full_name', 'gamer_name', 'is_active', 'profile_picture_url', 'avatar_public_id']
     });
     Ensure.exists(user, "user");
 

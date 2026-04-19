@@ -1,6 +1,8 @@
 import { Ensure } from "../../../common/errors/Ensure.handler";
 import { UserAchievement } from "../../../entities/UserAchievement";
 import { RepoService } from "../../repo.service";
+import { AchievementProgressService } from "../achievement/achievement-progress.service";
+import { UserService } from "../user/user.service";
 
 const MAX_DISPLAYED = 4;
 
@@ -10,6 +12,7 @@ export class UserAchievementService extends RepoService<UserAchievement> {
     this.findByUserAndAchievement = this.findByUserAndAchievement.bind(this);
     this.toggleDisplayed = this.toggleDisplayed.bind(this);
     this.getMyAchievements = this.getMyAchievements.bind(this);
+    this.setActiveAchievement = this.setActiveAchievement.bind(this);
   }
 
   async findByUserAndAchievement(userId: number, achievementId: number) {
@@ -20,11 +23,22 @@ export class UserAchievementService extends RepoService<UserAchievement> {
   }
 
   async getMyAchievements(userId: number) {
-    return await this.repo.find({
+    const rows = await this.repo.find({
       where: { user: { id: userId } } as any,
       relations: ["achievement"],
       order: { obtained_at: "DESC" } as any,
     });
+    const progressService = new AchievementProgressService();
+    const stats = await progressService.aggregateUserStats(userId);
+    return rows.map((ua) => ({
+      ...ua,
+      achievement: ua.achievement
+        ? {
+            ...ua.achievement,
+            ...progressService.getProgress(ua.achievement as any, stats, true),
+          }
+        : null,
+    }));
   }
 
   async toggleDisplayed(userAchievementId: number, userId: number) {
@@ -47,5 +61,23 @@ export class UserAchievementService extends RepoService<UserAchievement> {
 
     ua.displayed = !ua.displayed;
     return await this.repo.save(ua);
+  }
+
+  async setActiveAchievement(userAchievementId: number, userId: number) {
+    const ua = await this.repo.findOne({
+      where: { id: userAchievementId } as any,
+      relations: ["user", "achievement"],
+    });
+    Ensure.exists(ua, "user_achievement");
+    Ensure.forbidden(Number(ua.user.id) === Number(userId), "user_achievement");
+    Ensure.exists(ua.achievement, "achievement");
+
+    const userService = new UserService();
+    await userService.setSelectedAchievement(userId, ua.achievement.id);
+
+    return {
+      user_achievement_id: ua.id,
+      selected_achievement_id: ua.achievement.id,
+    };
   }
 }

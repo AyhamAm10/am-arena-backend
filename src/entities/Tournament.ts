@@ -1,6 +1,7 @@
 // src/entities/Tournament.ts
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinTable, ManyToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinTable, ManyToMany, OneToMany } from 'typeorm';
 import { User } from './User';
+import { Poll } from './Poll';
 
 @Entity('tournaments')
 export class Tournament {
@@ -40,6 +41,15 @@ export class Tournament {
 
   @Column({ default: true })
   is_active: boolean;
+
+  @Column({ default: false })
+  is_super: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  Xp_condition: number;
+
+  @OneToMany(() => Poll, (poll) => poll.tournament)
+  polls: Poll[];
 
   @CreateDateColumn()
   created_at: Date;

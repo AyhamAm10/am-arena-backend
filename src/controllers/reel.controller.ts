@@ -9,9 +9,14 @@ import { UpdateReelDto, updateReelSchema } from "../dto/reel/update-reel.dto";
 import { GetReelsQueryDto, getReelsQuerySchema } from "../dto/reel/get-reels-query.dto";
 import { AddCommentDto, addCommentSchema } from "../dto/reel/add-comment.dto";
 import { GetCommentsQueryDto, getCommentsQuerySchema } from "../dto/reel/get-comments-query.dto";
+import {
+  SearchTagUsersQueryDto,
+  searchTagUsersQuerySchema,
+} from "../dto/reel/search-tag-users-query.dto";
 import { ReelService } from "../services/repo/reel/reel.service";
 import { ReelCommentService } from "../services/repo/reel-comment/reel-comment.service";
 import { ReelLikeService } from "../services/repo/reel-like/reel-like.service";
+import { TagService } from "../services/repo/achievement/tag.service";
 import { Ensure } from "../common/errors/Ensure.handler";
 import { imageUrl } from "../utils/handle-generate-url";
 
@@ -25,6 +30,7 @@ export class ReelController {
     this.getReelComments = this.getReelComments.bind(this);
     this.likeReel = this.likeReel.bind(this);
     this.removeLike = this.removeLike.bind(this);
+    this.searchTagUsers = this.searchTagUsers.bind(this);
   }
 
   async createReel(req: Request, res: Response, next: NextFunction) {
@@ -42,6 +48,7 @@ export class ReelController {
         video_url: req.reelVideoUrl || dto.video_url || "",
         description: dto.description,
         userId,
+        mentioned_user_ids: dto.mentioned_user_ids,
       });
 
       return res.status(HttpStatusCode.CREATED).json(
@@ -101,6 +108,7 @@ export class ReelController {
         title: dto.title,
         description: dto.description,
         video_url: newVideoUrl,
+        mentioned_user_ids: dto.mentioned_user_ids,
       });
 
       return res.json(
@@ -144,13 +152,43 @@ export class ReelController {
       const dto = req.body as AddCommentDto;
 
       const reelCommentService = new ReelCommentService();
-      const result = await reelCommentService.addComment(reelId, userId, dto.comment);
+      const result = await reelCommentService.addComment(
+        reelId,
+        userId,
+        dto.comment,
+        dto.mentioned_user_ids ?? [],
+      );
 
       return res.status(HttpStatusCode.CREATED).json(
         ApiResponse.success(
           result,
           ErrorMessages.generateErrorMessage("comment", "created", lang)
         )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async searchTagUsers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      Ensure.exists(userId, "user");
+
+      const dto = (await validator(
+        searchTagUsersQuerySchema,
+        req.query,
+      )) as SearchTagUsersQueryDto;
+
+      const tagService = new TagService();
+      const users = await tagService.searchUsersForMention(userId, dto.query, dto.limit ?? 10);
+
+      return res.json(
+        ApiResponse.success(
+          users,
+          ErrorMessages.generateErrorMessage("users", "retrieved", lang),
+        ),
       );
     } catch (err) {
       next(err);

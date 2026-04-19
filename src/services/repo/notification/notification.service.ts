@@ -10,6 +10,7 @@ import { UserService } from "../user/user.service";
 import { ChatMemberService } from "../chat-member/chat-member.service";
 import { In } from "typeorm";
 import type { CreateAdminNotificationDto } from "../../../dto/admin/admin-notification.dto";
+import { Friend } from "../../../entities/Friend";
 
 function dedupePositiveUserIds(ids: readonly number[]): number[] {
   const seen = new Set<number>();
@@ -28,11 +29,29 @@ const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const BROADCAST_PAGE_SIZE = 200;
 const EXPO_CHUNK = 100;
 
+function numericFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
 type CreatePayload = {
   type: AppNotificationType;
   title: string;
   body: string;
   data: Record<string, unknown> | null;
+};
+
+type NotifyGlobalPollParams = {
+  pollId: number;
+  title: string;
+  body: string;
+  deepLink: string;
+  target: "all" | "selected";
+  userIds?: number[];
 };
 
 export class NotificationService extends RepoService<UserNotification> {
@@ -44,8 +63,10 @@ export class NotificationService extends RepoService<UserNotification> {
     this.notifyFriendRequest = this.notifyFriendRequest.bind(this);
     this.notifyTournamentCreated = this.notifyTournamentCreated.bind(this);
     this.notifyAchievementUnlocked = this.notifyAchievementUnlocked.bind(this);
+    this.notifyReelHighlight = this.notifyReelHighlight.bind(this);
     this.notifyManualToUsers = this.notifyManualToUsers.bind(this);
     this.notifyChatMessageForChannelMembers = this.notifyChatMessageForChannelMembers.bind(this);
+    this.notifyGlobalPoll = this.notifyGlobalPoll.bind(this);
   }
 
   async listForUser(userId: number, page: number, limit: number) {
@@ -57,15 +78,45 @@ export class NotificationService extends RepoService<UserNotification> {
       take: limit,
     });
 
-    const data = rows.map((n) => ({
+    const friendRequestPairs = rows
+      .filter((row) => row.type === "FRIEND_REQUEST")
+      .map((row) => ({
+        notificationId: row.id,
+        fromUserId: numericFromUnknown((row.data ?? {})["fromUserId"]),
+      }))
+      .filter((pair): pair is { notificationId: number; fromUserId: number } => pair.fromUserId != null);
+
+    const friendStatusByRequester = new Map<number, string>();
+    if (friendRequestPairs.length > 0) {
+      const requesterIds = Array.from(new Set(friendRequestPairs.map((pair) => pair.fromUserId)));
+      const friendRows = await this.repo.manager.getRepository(Friend).find({
+        where: requesterIds.map((requesterId) => ({
+          user_id: requesterId,
+          friend_user_id: userId,
+        })) as any,
+      });
+      for (const row of friendRows) {
+        friendStatusByRequester.set(Number(row.user_id), String(row.status ?? "pending"));
+      }
+    }
+
+    const data = rows.map((n) => {
+      const payload = { ...(n.data ?? {}) } as Record<string, unknown>;
+      if (n.type === "FRIEND_REQUEST") {
+        const fromUserId = numericFromUnknown(payload.fromUserId);
+        const status = fromUserId != null ? friendStatusByRequester.get(fromUserId) ?? "rejected" : "pending";
+        payload.status = status;
+      }
+      return {
       id: n.id,
       type: n.type,
       title: n.title,
       body: n.body,
-      data: n.data ?? null,
+      data: payload,
       read_at: n.read_at ? n.read_at.toISOString() : null,
       created_at: n.created_at instanceof Date ? n.created_at.toISOString() : String(n.created_at),
-    }));
+      };
+    });
 
     return { data, total, page, limit };
   }
@@ -169,12 +220,18 @@ export class NotificationService extends RepoService<UserNotification> {
     const userService = new UserService();
     const requester = await userService.findOneByCondition({ id: params.fromUserId } as any);
     Ensure.exists(requester, "user");
-    const title = "Friend request";
-    const body = `${requester.gamer_name} sent you a friend request`;
+    const title = "طلب صداقة جديد";
+    const body = `قام ${requester.gamer_name} بإرسال طلب صداقة`;
     const data: Record<string, unknown> = {
       type: "FRIEND_REQUEST",
+      userId: params.receiverUserId,
       fromUserId: params.fromUserId,
       requesterGamerName: requester.gamer_name,
+      status: "pending",
+      target: "friends",
+      focusTab: "requests",
+      focusUserId: params.fromUserId,
+      hasActions: true,
     };
     try {
       await this.createForUser(params.receiverUserId, {
@@ -191,11 +248,12 @@ export class NotificationService extends RepoService<UserNotification> {
 
   async notifyTournamentCreated(tournamentId: number, tournamentTitle: string) {
     const userService = new UserService();
-    const title = "New tournament";
+    const title = "بطولة جديدة";
     const body = tournamentTitle;
     const data: Record<string, unknown> = {
       type: "TOURNAMENT_CREATED",
       tournamentId,
+      target: "tournament",
     };
     try {
       let page = 1;
@@ -222,12 +280,14 @@ export class NotificationService extends RepoService<UserNotification> {
     userAchievementId: number;
     achievement: Achievement;
   }) {
-    const title = "Achievement unlocked";
-    const body = `You unlocked: ${params.achievement.name}`;
+    const title = "تم فتح إنجاز جديد";
+    const body = `حصلت على الإنجاز: ${params.achievement.name}`;
     const data: Record<string, unknown> = {
       type: "ACHIEVEMENT_UNLOCKED",
       achievementId: params.achievement.id,
       userAchievementId: params.userAchievementId,
+      target: "achievements",
+      focusAchievementId: params.achievement.id,
     };
     try {
       await this.createForUser(params.userId, {
@@ -239,6 +299,39 @@ export class NotificationService extends RepoService<UserNotification> {
       await this.sendPushToUsers([params.userId], title, body, data);
     } catch (err) {
       logger.warn("notifyAchievementUnlocked failed", err);
+    }
+  }
+
+  async notifyReelHighlight(params: {
+    receiverUserId: number;
+    reelId: number;
+    mentionedByUserId: number;
+    commentId?: number;
+  }) {
+    const userService = new UserService();
+    const actor = await userService.findOneByCondition({ id: params.mentionedByUserId } as any);
+    Ensure.exists(actor, "user");
+    const title = "تم ذكرك في هايلايت";
+    const body = `${actor.gamer_name} قام بذكرك في ريل مميز`;
+    const data: Record<string, unknown> = {
+      type: "REEL_HIGHLIGHT",
+      reelId: params.reelId,
+      mentionedByUserId: params.mentionedByUserId,
+      creatorId: params.mentionedByUserId,
+      target: "reel",
+      openComments: params.commentId != null,
+      commentId: params.commentId ?? null,
+    };
+    try {
+      await this.createForUser(params.receiverUserId, {
+        type: "REEL_HIGHLIGHT",
+        title,
+        body,
+        data,
+      });
+      await this.sendPushToUsers([params.receiverUserId], title, body, data);
+    } catch (err) {
+      logger.warn("notifyReelHighlight failed", err);
     }
   }
 
@@ -256,6 +349,7 @@ export class NotificationService extends RepoService<UserNotification> {
       type: "MANUAL",
       route: dto.route ?? "",
       actionLabel: dto.action_label ?? "",
+      target: dto.route ? "manual_route" : "message_only",
     };
     try {
       await this.createForUsers(userIds, {
@@ -267,6 +361,56 @@ export class NotificationService extends RepoService<UserNotification> {
       await this.sendPushToUsers(userIds, title, body, data);
     } catch (err) {
       logger.warn("notifyManualToUsers failed", err);
+    }
+  }
+
+  async notifyGlobalPoll(params: NotifyGlobalPollParams) {
+    const data: Record<string, unknown> = {
+      type: "GLOBAL_POLL",
+      pollId: params.pollId,
+      route: params.deepLink,
+      deepLink: params.deepLink,
+      notificationType: "global_poll",
+      target: "arena_voting",
+      focusPollId: params.pollId,
+    };
+
+    try {
+      if (params.target === "all") {
+        const userService = new UserService();
+        let page = 1;
+        while (true) {
+          const { ids, total } = await userService.getActiveUserIdsPage(page, BROADCAST_PAGE_SIZE);
+          if (ids.length === 0) break;
+          await this.createForUsers(ids, {
+            type: "GLOBAL_POLL",
+            title: params.title,
+            body: params.body,
+            data,
+          });
+          await this.sendPushToUsers(ids, params.title, params.body, data);
+          if (page * BROADCAST_PAGE_SIZE >= total) break;
+          page += 1;
+        }
+        return;
+      }
+
+      const userIds = dedupePositiveUserIds(params.userIds ?? []);
+      Ensure.custom(userIds.length > 0, "Select at least one user");
+
+      const userService = new UserService();
+      const found = await userService.count({ id: In(userIds) } as any);
+      Ensure.custom(found === userIds.length, "One or more users were not found");
+
+      await this.createForUsers(userIds, {
+        type: "GLOBAL_POLL",
+        title: params.title,
+        body: params.body,
+        data,
+      });
+      await this.sendPushToUsers(userIds, params.title, params.body, data);
+    } catch (err) {
+      logger.warn("notifyGlobalPoll failed", err);
     }
   }
 
@@ -289,6 +433,8 @@ export class NotificationService extends RepoService<UserNotification> {
     const data: Record<string, unknown> = {
       type: "CHAT_MESSAGE",
       chatId: params.channelId,
+      target: "chat",
+      messagePreview: body,
     };
 
     try {
@@ -306,7 +452,11 @@ export class NotificationService extends RepoService<UserNotification> {
 
   /** Optional hook for winner / system announcements (e.g. tournament results). */
   async notifySystemUsers(userIds: number[], title: string, body: string, extraData?: Record<string, unknown>) {
-    const data: Record<string, unknown> = { type: "SYSTEM_MESSAGE", ...(extraData ?? {}) };
+    const data: Record<string, unknown> = {
+      type: "SYSTEM_MESSAGE",
+      target: extraData?.route ? "manual_route" : "message_only",
+      ...(extraData ?? {}),
+    };
     try {
       await this.createForUsers(userIds, {
         type: "SYSTEM_MESSAGE",

@@ -1,5 +1,5 @@
 // src/entities/User.ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany, ManyToOne } from "typeorm";
 
 import { Message } from './Message';
 import { Chat } from './Chat';
@@ -9,6 +9,7 @@ import { Reel } from './Reel';
 import { Friend } from './Friend';
 import { UserAchievement } from './UserAchievement';
 import { UserNotification } from './UserNotification';
+import { Achievement } from "./Achievement";
 
 
 export enum UserRole {
@@ -30,6 +31,9 @@ export class User {
 
   @Column({ nullable: true })
   profile_picture_url: string;
+
+  @Column({ nullable: true })
+  avatar_public_id: string;
 
   @Column({ unique: true })
   email: string;
@@ -85,6 +89,9 @@ export class User {
 
   @OneToMany(() => UserAchievement, (ua) => ua.user)
   achievements: UserAchievement[];
+
+  @ManyToOne(() => Achievement, { nullable: true })
+  selected_achievement: Achievement;
 
   @ManyToMany(() => Tournament, (tournament) => tournament.winners)
   wonTournaments: Tournament[];

@@ -5,6 +5,7 @@ import { Achievement } from "../entities/Achievement";
 import { Chat } from "../entities/Chat";
 import { ChatMember } from "../entities/ChatMember";
 import { Friend } from "../entities/Friend";
+import { Highlight } from "../entities/Highlight";
 import { HeroContent } from "../entities/HeroContent";
 import { Message } from "../entities/Message";
 import { PubgGame } from "../entities/PubgGame";
@@ -14,10 +15,14 @@ import { PubgRegistrationFieldValue } from "../entities/PubgRegistrationFieldVal
 import { Reel } from "../entities/Reel";
 import { ReelComment } from "../entities/ReelComment";
 import { ReelLike } from "../entities/ReelLike";
+import { Tag } from "../entities/Tag";
 import { Tournament } from "../entities/Tournament";
 import { User } from "../entities/User";
 import { UserAchievement } from "../entities/UserAchievement";
 import { UserNotification } from "../entities/UserNotification";
+import { Poll } from "../entities/Poll";
+import { PollOption } from "../entities/PollOption";
+import { Vote } from "../entities/Vote";
 
 
 dotenv.config();
@@ -41,6 +46,7 @@ export const AppDataSource = new DataSource({
     Chat,
     ChatMember,
     Friend,
+    Highlight,
     HeroContent,
     Message,
     PubgGame,
@@ -50,10 +56,14 @@ export const AppDataSource = new DataSource({
     Reel,
     ReelComment,
     ReelLike,
+    Tag,
     Tournament,
     User,
     UserAchievement,
     UserNotification,
+    Poll,
+    PollOption,
+    Vote,
   ],
 
   migrations: [__dirname + "/../migrations/*.{js,ts}"],
