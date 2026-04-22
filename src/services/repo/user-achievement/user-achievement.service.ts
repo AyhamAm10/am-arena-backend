@@ -3,6 +3,7 @@ import { UserAchievement } from "../../../entities/UserAchievement";
 import { RepoService } from "../../repo.service";
 import { AchievementProgressService } from "../achievement/achievement-progress.service";
 import { UserService } from "../user/user.service";
+import { mediaResponseUrl } from "../../../utils/media-url";
 
 const MAX_DISPLAYED = 4;
 
@@ -35,6 +36,7 @@ export class UserAchievementService extends RepoService<UserAchievement> {
       achievement: ua.achievement
         ? {
             ...ua.achievement,
+            icon_url: mediaResponseUrl(ua.achievement.icon_url),
             ...progressService.getProgress(ua.achievement as any, stats, true),
           }
         : null,

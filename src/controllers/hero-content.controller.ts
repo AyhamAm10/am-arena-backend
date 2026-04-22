@@ -42,6 +42,9 @@ export class HeroContentController {
       const row = await heroContentService.createHeroContent({
         ...dto,
         image_url: (req.file?.path as string) || dto.image || "",
+        image_public_id: req.file
+          ? ((req.file.filename as string) || null)
+          : null,
       });
 
       return res.status(HttpStatusCode.CREATED).json(
@@ -65,9 +68,14 @@ export class HeroContentController {
         heroContentIdParamsSchema,
         req.params
       )) as HeroContentIdParamsDto;
-      const payload: UpdateHeroContentDto = {
+      const payload: UpdateHeroContentDto & { image_public_id?: string | null } = {
         ...dto,
-        ...(req.file ? { image: req.file.path as string } : {}),
+        ...(req.file
+          ? {
+              image: req.file.path as string,
+              image_public_id: (req.file.filename as string) || null,
+            }
+          : {}),
       };
 
       const heroContentService = new HeroContentService();

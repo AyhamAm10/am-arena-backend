@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from "express";
 import { APIError, HttpStatusCode } from "../common/errors/api.error";
-import { imageUrl } from "../utils/handle-generate-url";
 import { uploadReelVideo } from "./upload";
 
 /** Same as create upload but does not require a file (for PATCH reel). */
@@ -10,7 +9,8 @@ export const optionalReelVideoUploadMiddleware: Array<
   uploadReelVideo.single("video"),
   (req: Request, res: Response, next: NextFunction) => {
     if (req.file) {
-      req.reelVideoUrl = imageUrl(req.file.filename);
+      req.reelVideoUrl = req.file.path as string;
+      req.reelVideoPublicId = req.file.filename as string;
     }
 
     next();
@@ -18,8 +18,8 @@ export const optionalReelVideoUploadMiddleware: Array<
 ];
 
 /**
- * Parses multipart/form-data, saves the `video` file under public/uploads,
- * and sets `req.reelVideoUrl` to the same relative path shape as profile images (`image/...`).
+ * Parses multipart/form-data, uploads the `video` file to Cloudinary,
+ * and sets `req.reelVideoUrl` / `req.reelVideoPublicId` from the upload result.
  */
 export const reelVideoUploadMiddleware: Array<
   (req: Request, res: Response, next: NextFunction) => void
@@ -32,7 +32,8 @@ export const reelVideoUploadMiddleware: Array<
         new APIError(HttpStatusCode.BAD_REQUEST, "Video file is required")
       );
     }
-    req.reelVideoUrl = imageUrl(file.filename);
+    req.reelVideoUrl = file.path as string;
+    req.reelVideoPublicId = file.filename as string;
     next();
   },
 ];

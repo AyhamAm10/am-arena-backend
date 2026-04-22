@@ -27,6 +27,8 @@ import {
   type UpdatePollDto,
 } from "../dto/poll/poll.dto";
 import { PollService } from "../services/repo/poll/poll.service";
+import { AppDataSource } from "../config/data_source";
+import { User } from "../entities/User";
 
 export class PollController {
   private readonly pollService = new PollService();
@@ -269,10 +271,19 @@ export class PollController {
         pollAnalyticsQuerySchema,
         req.query,
       )) as PollAnalyticsQueryDto;
+      let requesterRole: string | null = null;
+      const uid = req.currentUser;
+      if (uid != null) {
+        const u = await AppDataSource.getRepository(User).findOne({
+          where: { id: uid },
+          select: { role: true },
+        });
+        requesterRole = u?.role ?? null;
+      }
       const result = await this.pollService.getPollAnalytics(
         params.id,
         query,
-        (req.headers["x-dashboard-role"] as string | undefined) ?? null,
+        requesterRole,
       );
       return res.json(
         ApiResponse.success(

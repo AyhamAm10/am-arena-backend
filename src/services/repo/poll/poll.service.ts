@@ -1,6 +1,7 @@
 import { APIError, HttpStatusCode } from "../../../common/errors/api.error";
 import { Ensure } from "../../../common/errors/Ensure.handler";
 import { AppDataSource } from "../../../config/data_source";
+import { In } from "typeorm";
 import type {
   AddPollOptionDto,
   CreatePollDto,
@@ -239,6 +240,74 @@ export class PollService extends RepoService<Poll> {
     };
   }
 
+  private buildPollDetails(
+    poll: Poll,
+    optionCounts: Map<number, number>,
+    totalVotes: number,
+    currentVoteOptionId: number | null,
+  ) {
+    return {
+      ...this.buildPollSummary(poll, totalVotes),
+      closed: isPollClosed(poll),
+      current_user_vote_option_id: currentVoteOptionId,
+      options: poll.options.map((option) => {
+        const votesCount = optionCounts.get(option.id) ?? 0;
+        return {
+          id: option.id,
+          label: option.label,
+          type: option.type,
+          votes_count: votesCount,
+          percentage: totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0,
+          selected: currentVoteOptionId === option.id,
+          user: option.user ? serializeUserRef(option.user) : null,
+        };
+      }),
+    };
+  }
+
+  private async buildVoteAggregates(
+    pollIds: number[],
+    currentUserId?: number | null,
+  ) {
+    const counts = await this.voteRepo
+      .createQueryBuilder("vote")
+      .select('"vote"."pollId"', "pollId")
+      .addSelect('"vote"."optionId"', "optionId")
+      .addSelect("COUNT(*)", "count")
+      .where('"vote"."pollId" IN (:...pollIds)', { pollIds })
+      .groupBy('"vote"."pollId"')
+      .addGroupBy('"vote"."optionId"')
+      .getRawMany<{ pollId: string; optionId: string; count: string }>();
+
+    const optionCountsByPoll = new Map<number, Map<number, number>>();
+    const totalsByPoll = new Map<number, number>();
+    for (const row of counts) {
+      const pollId = Number(row.pollId);
+      const optionId = Number(row.optionId);
+      const count = Number(row.count);
+      const optionCounts = optionCountsByPoll.get(pollId) ?? new Map<number, number>();
+      optionCounts.set(optionId, count);
+      optionCountsByPoll.set(pollId, optionCounts);
+      totalsByPoll.set(pollId, (totalsByPoll.get(pollId) ?? 0) + count);
+    }
+
+    const currentVoteByPoll = new Map<number, number | null>();
+    if (currentUserId) {
+      const currentVotes = await this.voteRepo
+        .createQueryBuilder("vote")
+        .select('"vote"."pollId"', "pollId")
+        .addSelect('"vote"."optionId"', "optionId")
+        .where('"vote"."pollId" IN (:...pollIds)', { pollIds })
+        .andWhere('"vote"."userId" = :userId', { userId: currentUserId })
+        .getRawMany<{ pollId: string; optionId: string }>();
+      for (const row of currentVotes) {
+        currentVoteByPoll.set(Number(row.pollId), Number(row.optionId));
+      }
+    }
+
+    return { optionCountsByPoll, totalsByPoll, currentVoteByPoll };
+  }
+
   private async ensureUserCanVote(poll: Poll, userId: number) {
     Ensure.custom(!isPollClosed(poll), "This poll is closed");
 
@@ -453,36 +522,14 @@ export class PollService extends RepoService<Poll> {
 
   async getPollById(pollId: number, currentUserId?: number | null) {
     const poll = await this.getPollEntityOrFail(pollId);
-    const votes = await this.voteRepo.find({
-      where: { poll: { id: pollId } } as any,
-      relations: ["option", "user"],
-    });
-    const totalVotes = votes.length;
-    const currentVote = currentUserId
-      ? votes.find((vote) => Number(vote.user?.id) === Number(currentUserId))
-      : null;
-    const optionCounts = new Map<number, number>();
-    for (const vote of votes) {
-      optionCounts.set(vote.option.id, (optionCounts.get(vote.option.id) ?? 0) + 1);
-    }
-
-    return {
-      ...this.buildPollSummary(poll, totalVotes),
-      closed: isPollClosed(poll),
-      current_user_vote_option_id: currentVote?.option?.id ?? null,
-      options: poll.options.map((option) => {
-        const votesCount = optionCounts.get(option.id) ?? 0;
-        return {
-          id: option.id,
-          label: option.label,
-          type: option.type,
-          votes_count: votesCount,
-          percentage: totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0,
-          selected: currentVote?.option?.id === option.id,
-          user: option.user ? serializeUserRef(option.user) : null,
-        };
-      }),
-    };
+    const { optionCountsByPoll, totalsByPoll, currentVoteByPoll } =
+      await this.buildVoteAggregates([pollId], currentUserId);
+    return this.buildPollDetails(
+      poll,
+      optionCountsByPoll.get(pollId) ?? new Map<number, number>(),
+      totalsByPoll.get(pollId) ?? 0,
+      currentVoteByPoll.get(pollId) ?? null,
+    );
   }
 
   async getTournamentPolls(tournamentId: number, currentUserId?: number | null) {
@@ -491,8 +538,19 @@ export class PollService extends RepoService<Poll> {
       relations: ["options", "options.user", "tournament", "chat", "message"],
       order: { created_at: "DESC" },
     });
-    return Promise.all(
-      polls.map((poll) => this.getPollById(poll.id, currentUserId)),
+    if (polls.length === 0) {
+      return [];
+    }
+    const pollIds = polls.map((poll) => poll.id);
+    const { optionCountsByPoll, totalsByPoll, currentVoteByPoll } =
+      await this.buildVoteAggregates(pollIds, currentUserId);
+    return polls.map((poll) =>
+      this.buildPollDetails(
+        poll,
+        optionCountsByPoll.get(poll.id) ?? new Map<number, number>(),
+        totalsByPoll.get(poll.id) ?? 0,
+        currentVoteByPoll.get(poll.id) ?? null,
+      )
     );
   }
 
@@ -502,8 +560,19 @@ export class PollService extends RepoService<Poll> {
       relations: ["options", "options.user", "tournament", "chat", "message"],
       order: { created_at: "DESC" },
     });
-    return Promise.all(
-      polls.map((poll) => this.getPollById(poll.id, currentUserId)),
+    if (polls.length === 0) {
+      return [];
+    }
+    const pollIds = polls.map((poll) => poll.id);
+    const { optionCountsByPoll, totalsByPoll, currentVoteByPoll } =
+      await this.buildVoteAggregates(pollIds, currentUserId);
+    return polls.map((poll) =>
+      this.buildPollDetails(
+        poll,
+        optionCountsByPoll.get(poll.id) ?? new Map<number, number>(),
+        totalsByPoll.get(poll.id) ?? 0,
+        currentVoteByPoll.get(poll.id) ?? null,
+      )
     );
   }
 

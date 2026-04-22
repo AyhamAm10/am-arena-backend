@@ -31,13 +31,19 @@ export class AchievementController {
       await validator(createAchievementSchema, req.body);
       const dto = req.body as CreateAchievementDto;
       let iconUrl: string | undefined = dto.icon_url;
+      let iconPublicId: string | null | undefined;
       if (req.file) {
-        iconUrl = `icons/${req.file.filename}`;
+        iconUrl = req.file.path as string;
+        iconPublicId = (req.file.filename as string) || null;
       }
       Ensure.required(iconUrl, "icon");
 
       const achievementService = new AchievementService();
-      const result = await achievementService.createAchievement({ ...dto, icon_url: iconUrl });
+      const result = await achievementService.createAchievement({
+        ...dto,
+        icon_url: iconUrl,
+        icon_public_id: iconPublicId ?? null,
+      });
 
       return res.status(HttpStatusCode.CREATED).json(
         ApiResponse.success(
@@ -56,9 +62,14 @@ export class AchievementController {
       await validator(updateAchievementSchema, req.body);
       const dto = req.body as UpdateAchievementDto;
       const id = req.params.id as string;
-      const payload: UpdateAchievementDto = {
+      const payload: UpdateAchievementDto & { icon_public_id?: string | null } = {
         ...dto,
-        ...(req.file ? { icon_url: `icons/${req.file.filename}` } : {}),
+        ...(req.file
+          ? {
+              icon_url: req.file.path as string,
+              icon_public_id: (req.file.filename as string) || null,
+            }
+          : {}),
       };
 
       const achievementService = new AchievementService();

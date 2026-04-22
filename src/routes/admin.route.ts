@@ -5,6 +5,7 @@ import { checkRole } from "../middlewares/role.middleware";
 import { UserRole } from "../entities/User";
 import { upload } from "../middlewares/upload";
 import { optionalReelVideoUploadMiddleware } from "../middlewares/reel-video-upload.middleware";
+import { coinsStrictRateLimiter } from "../middlewares/rate-limit/rate-limiters";
 
 const adminRouter = Router();
 const adminController = new AdminController();
@@ -27,6 +28,22 @@ adminRouter.post("/channels/:id/messages", adminController.sendChannelMessage);
 adminRouter.get("/notifications", adminController.getNotifications);
 adminRouter.post("/notifications", adminController.createNotification);
 adminRouter.delete("/notifications/:id", adminController.deleteNotification);
+adminRouter.get("/package-requests", adminController.getPackageRequests);
+adminRouter.patch(
+  "/package-requests/:id/approve",
+  coinsStrictRateLimiter,
+  adminController.approvePackageRequest
+);
+adminRouter.patch(
+  "/package-requests/:id/reject",
+  coinsStrictRateLimiter,
+  adminController.rejectPackageRequest
+);
+adminRouter.post(
+  "/manual-coins",
+  coinsStrictRateLimiter,
+  adminController.createManualCoins
+);
 
 adminRouter.patch("/reels/:id", ...optionalReelVideoUploadMiddleware, adminController.updateReel);
 adminRouter.delete("/reels/:id", adminController.deleteReel);

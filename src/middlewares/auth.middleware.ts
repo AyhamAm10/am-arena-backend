@@ -7,7 +7,6 @@ import { User } from "../entities/User";
 import { JwtService } from "../services/jwt/jwt.service";
 import { getLanguage } from "./lang.middleware";
 import { Ensure } from "../common/errors/Ensure.handler";
-import { resolveDashboardRoleUser } from "./dashboard-role.middleware";
 
 export const optionalAuthMiddleware = async (
   req: Request,
@@ -16,15 +15,6 @@ export const optionalAuthMiddleware = async (
 ) => {
   try {
     const authHeader = req.headers.authorization;
-    const dashboardUser = await resolveDashboardRoleUser(
-      req.headers["x-dashboard-role"] as string | undefined
-    );
-
-    if (dashboardUser) {
-      req.currentUser = dashboardUser.id;
-      return next();
-    }
-
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next();
     }
@@ -37,8 +27,11 @@ export const optionalAuthMiddleware = async (
       const userId = decoded?.userId;
       if (userId) {
         const userRepository = AppDataSource.getRepository(User);
-        const user = await userRepository.findOne({ where: { id: userId } });
-        if (user) req.currentUser = user.id;
+        const user = await userRepository.findOne({
+          where: { id: userId },
+          select: ["id", "is_active"],
+        });
+        if (user?.is_active) req.currentUser = user.id;
       }
     } catch {
       // token invalid/expired – continue as unauthenticated
@@ -58,14 +51,6 @@ export const authMiddleware = async (
   try {
     const lang = getLanguage();
     const authHeader = req.headers.authorization;
-    const dashboardUser = await resolveDashboardRoleUser(
-      req.headers["x-dashboard-role"] as string | undefined
-    );
-
-    if (dashboardUser) {
-      req.currentUser = dashboardUser.id;
-      return next();
-    }
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next(
@@ -114,9 +99,11 @@ export const authMiddleware = async (
     const userRepository = AppDataSource.getRepository(User);
     const user = await userRepository.findOne({
       where: { id: userId },
+      select: ["id", "is_active"],
     });
 
     Ensure.exists(user, "user");
+    Ensure.forbidden(Boolean(user?.is_active), "user");
 
     req.currentUser = user?.id;
 

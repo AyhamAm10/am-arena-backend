@@ -1,4 +1,8 @@
 import multer from "multer";
+import path from "path";
+import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+import type { Request } from "express";
+import type { StorageEngine } from "multer";
 
 const imageMimeTypes = [
   "image/jpeg",
@@ -10,23 +14,91 @@ const imageMimeTypes = [
   "image/heif",
 ];
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
+function sanitizeFilename(originalName: string) {
+  const ext = path.extname(originalName || "").toLowerCase();
+  const base = path
+    .basename(originalName || "file", ext)
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 60) || "file";
+  return `${Date.now()}-${base}${ext}`;
+}
 
-const iconStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "public/icons/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
-  },
-});
+let cloudinaryConfigured = false;
+function ensureCloudinaryConfigured() {
+  if (cloudinaryConfigured) return;
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
+  const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
+  const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
+  if (!cloudName || !apiKey || !apiSecret) {
+    throw new Error("Cloudinary environment variables are missing");
+  }
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
+  cloudinaryConfigured = true;
+}
+
+class CloudinaryStorage implements StorageEngine {
+  constructor(
+    private readonly folder: string,
+    private readonly resourceType: "image" | "video",
+  ) {}
+
+  _handleFile(
+    _req: Request,
+    file: any,
+    cb: (error?: unknown, info?: Record<string, unknown>) => void
+  ): void {
+    ensureCloudinaryConfigured();
+    const chunks: Buffer[] = [];
+    file.stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    file.stream.on("error", (error) => cb(error));
+    file.stream.on("end", () => {
+      const buffer = Buffer.concat(chunks);
+      const publicId = sanitizeFilename(file.originalname).replace(/\.[^.]+$/, "");
+      const upload = cloudinary.uploader.upload_stream(
+        {
+          folder: this.folder,
+          resource_type: this.resourceType,
+          public_id: publicId,
+        },
+        (error, result) => {
+          if (error || !result) {
+            cb(error || new Error("Cloudinary upload failed"));
+            return;
+          }
+          const uploadResult = result as UploadApiResponse;
+          cb(undefined, {
+            filename: uploadResult.public_id,
+            path: uploadResult.secure_url,
+            size: uploadResult.bytes,
+          });
+        }
+      );
+      upload.end(buffer);
+    });
+  }
+
+  _removeFile(
+    _req: Request,
+    file: any,
+    cb: (error: Error | null) => void
+  ): void {
+    const publicId = file.filename || "";
+    if (!publicId) {
+      cb(null);
+      return;
+    }
+    cloudinary.uploader
+      .destroy(publicId, { resource_type: this.resourceType })
+      .then(() => cb(null))
+      .catch(() => cb(null));
+  }
+}
 
 const imageFilter = (req, file, cb) => {
   if (imageMimeTypes.includes(file.mimetype)) {
@@ -36,20 +108,15 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
-const iconMimeTypes = [...imageMimeTypes, "image/svg+xml"];
+const iconMimeTypes = [...imageMimeTypes];
 
-/** Achievement icons: raster images + SVG (`image/svg+xml`). */
+/** Achievement icons: raster images only (SVG disabled for XSS hardening). */
 const iconFileFilter = (req, file, cb) => {
   if (iconMimeTypes.includes(file.mimetype)) {
     cb(null, true);
     return;
   }
-  const name = file.originalname?.toLowerCase() ?? "";
-  if (name.endsWith(".svg")) {
-    cb(null, true);
-    return;
-  }
-  cb(new Error("Only image or SVG icon files are allowed!"), false);
+  cb(new Error("Only raster image icon files are allowed!"), false);
 };
 
 const videoMimeTypes = [
@@ -68,6 +135,10 @@ const videoFilter = (req, file, cb) => {
   }
 };
 
+const imageStorage: StorageEngine = new CloudinaryStorage("uploads", "image");
+const iconStorage: StorageEngine = new CloudinaryStorage("icons", "image");
+const videoStorage: StorageEngine = new CloudinaryStorage("reels", "video");
+
 export const uploadIcon = multer({
   storage: iconStorage,
   fileFilter: iconFileFilter,
@@ -75,13 +146,13 @@ export const uploadIcon = multer({
 });
 
 export const upload = multer({
-  storage: storage,
+  storage: imageStorage,
   fileFilter: imageFilter,
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
 export const uploadReelVideo = multer({
-  storage,
+  storage: videoStorage,
   fileFilter: videoFilter,
   limits: { fileSize: 100 * 1024 * 1024 },
 });

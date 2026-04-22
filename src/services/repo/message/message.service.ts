@@ -1,4 +1,5 @@
 import { AppDataSource } from "../../../config/data_source";
+import { ChatMember } from "../../../entities/ChatMember";
 import { Message } from "../../../entities/Message";
 import { Chat } from "../../../entities/Chat";
 import { User } from "../../../entities/User";
@@ -15,7 +16,24 @@ export type MessageRow = {
 export class MessageService {
   private readonly repo = AppDataSource.getRepository(Message);
 
-  async listByChat(chatId: number, page = 1, limit = 50): Promise<{ data: MessageRow[]; total: number; page: number; limit: number }> {
+  private async ensureUserCanAccessChat(chatId: number, userId?: number) {
+    Ensure.exists(userId, "user");
+    const membership = await AppDataSource.getRepository(ChatMember).findOne({
+      where: {
+        chat: { id: chatId },
+        user: { id: userId },
+      } as any,
+    });
+    Ensure.exists(membership, "channel");
+  }
+
+  async listByChat(
+    chatId: number,
+    userId?: number,
+    page = 1,
+    limit = 50,
+  ): Promise<{ data: MessageRow[]; total: number; page: number; limit: number }> {
+    await this.ensureUserCanAccessChat(chatId, userId);
     const skip = (page - 1) * limit;
 
     const [messages, total] = await this.repo.findAndCount({
@@ -41,6 +59,7 @@ export class MessageService {
     const chatRepo = AppDataSource.getRepository(Chat);
     const chat = await chatRepo.findOneBy({ id: chatId });
     Ensure.exists(chat, "channel");
+    await this.ensureUserCanAccessChat(chatId, senderId);
 
     const message = await this.repo.save(
       this.repo.create({

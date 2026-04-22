@@ -7,6 +7,7 @@ const gameSchema = yup.object({
   type: yup.string().oneOf(pubgTypeEnum).required("Game type is required"),
   map: yup.string().required("Map is required"),
   image: yup.string().optional(),
+  image_public_id: yup.string().optional().nullable(),
 });
 
 const registrationFieldSchema = yup.object({

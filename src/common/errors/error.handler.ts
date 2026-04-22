@@ -2,6 +2,13 @@ import { NextFunction, Request, Response } from "express";
 import { logger } from "../../logging/logger";
 import { APIError, HttpStatusCode } from "./api.error";
 import { HttpError } from "./http.error";
+import { Environment } from "../../environment";
+
+function safeLogMessage(message: string, maxLen = 500): string {
+  const s = message.replace(/\s+/g, " ").trim();
+  if (s.length <= maxLen) return s;
+  return `${s.slice(0, maxLen)}…`;
+}
 
 const errorHandler = (
   error: Error,
@@ -9,8 +16,12 @@ const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  logger.error(`[${req.method}] ${req.url} - ${error.message}`);
-  logger.error(error.stack);
+  if (Environment.isProduction()) {
+    logger.error(`[${req.method}] ${safeLogMessage(req.url)} — ${error.name}`);
+  } else {
+    logger.error(`[${req.method}] ${req.url} - ${error.message}`);
+    logger.error(error.stack);
+  }
 
   if (error instanceof APIError) {
     return res.status(error.httpCode).json({
@@ -22,7 +33,7 @@ const errorHandler = (
     });
   }
 
-  if (error instanceof HttpError ) {
+  if (error instanceof HttpError) {
     return res.status(error.statusCode).json({
       success: false,
       status: error.statusCode,

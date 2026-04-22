@@ -26,6 +26,19 @@ import {
   createSuperTournamentSchema,
   updateSuperTournamentSchema,
 } from "../dto/admin/admin-super-tournament.dto";
+import {
+  AdminPaymentIdParamsDto,
+  adminPaymentIdParamsSchema,
+  approvePackageRequestSchema,
+  GetAdminPackageRequestsQueryDto,
+  getAdminPackageRequestsQuerySchema,
+  rejectPackageRequestSchema,
+} from "../dto/admin/admin-package-requests.dto";
+import {
+  createManualCoinsSchema,
+  CreateManualCoinsDto,
+} from "../dto/admin/admin-manual-coins.dto";
+import { PaymentService } from "../services/repo/payment/payment.service";
 
 function normalizeMultipartTournamentBody(body: Request["body"]) {
   const normalized = { ...body } as Record<string, unknown>;
@@ -67,6 +80,10 @@ export class AdminController {
     this.createSuperTournament = this.createSuperTournament.bind(this);
     this.updateSuperTournament = this.updateSuperTournament.bind(this);
     this.deleteSuperTournament = this.deleteSuperTournament.bind(this);
+    this.getPackageRequests = this.getPackageRequests.bind(this);
+    this.approvePackageRequest = this.approvePackageRequest.bind(this);
+    this.rejectPackageRequest = this.rejectPackageRequest.bind(this);
+    this.createManualCoins = this.createManualCoins.bind(this);
   }
 
   async getUsers(req: Request, res: Response, next: NextFunction) {
@@ -308,6 +325,9 @@ export class AdminController {
       const result = await this.adminService.updateReelAsAdmin(params.id, {
         ...dto,
         ...(req.reelVideoUrl ? { video_url: req.reelVideoUrl } : {}),
+        ...(req.reelVideoPublicId
+          ? { video_public_id: req.reelVideoPublicId }
+          : {}),
         actorUserId: currentUserId,
       });
 
@@ -371,6 +391,9 @@ export class AdminController {
         game: {
           ...dto.game,
           image: (req.file?.path as string) || dto.game.image || "",
+          image_public_id: req.file
+            ? ((req.file.filename as string) || null)
+            : (dto.game.image_public_id ?? null),
         },
       });
 
@@ -400,6 +423,7 @@ export class AdminController {
               game: {
                 ...(dto.game || {}),
                 image: req.file.path as string,
+                image_public_id: (req.file.filename as string) || null,
               },
             }
           : {}),
@@ -426,6 +450,99 @@ export class AdminController {
         ApiResponse.success(
           {},
           ErrorMessages.generateErrorMessage("super tournament", "deleted", lang),
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPackageRequests(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const dto = (await validator(
+        getAdminPackageRequestsQuerySchema,
+        req.query,
+      )) as GetAdminPackageRequestsQueryDto;
+      const paymentService = new PaymentService();
+      const { data, total, page, limit } = await paymentService.listPackageRequests(
+        dto,
+      );
+      return res.json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage(
+            "package requests",
+            "retrieved",
+            lang,
+          ),
+          { count: total, page, limit },
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async approvePackageRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const currentUserId = req.currentUser;
+      Ensure.exists(currentUserId, "user");
+      const params = (await validator(
+        adminPaymentIdParamsSchema,
+        req.params,
+      )) as AdminPaymentIdParamsDto;
+      await validator(approvePackageRequestSchema, req.body);
+      const paymentService = new PaymentService();
+      const data = await paymentService.approveRequest(params.id, currentUserId!);
+      return res.json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage("payment", "updated", lang),
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async rejectPackageRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const params = (await validator(
+        adminPaymentIdParamsSchema,
+        req.params,
+      )) as AdminPaymentIdParamsDto;
+      await validator(rejectPackageRequestSchema, req.body);
+      const paymentService = new PaymentService();
+      const data = await paymentService.rejectRequest(params.id);
+      return res.json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage("payment", "updated", lang),
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createManualCoins(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      const currentUserId = req.currentUser;
+      Ensure.exists(currentUserId, "user");
+      const dto = (await validator(
+        createManualCoinsSchema,
+        req.body,
+      )) as CreateManualCoinsDto;
+      const paymentService = new PaymentService();
+      const data = await paymentService.addManualCoins(dto, currentUserId!);
+      return res.status(HttpStatusCode.CREATED).json(
+        ApiResponse.success(
+          data,
+          ErrorMessages.generateErrorMessage("wallet", "updated", lang),
         ),
       );
     } catch (error) {

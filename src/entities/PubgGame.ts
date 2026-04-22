@@ -17,7 +17,10 @@ export class PubgGame {
 
   @Column()
   image: string;
-  
+
+  @Column({ nullable: true })
+  image_public_id: string | null;
+
   @Column()
   map: string;
 

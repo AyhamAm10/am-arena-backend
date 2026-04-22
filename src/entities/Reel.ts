@@ -17,6 +17,9 @@ export class Reel {
   @Column()
   video_url: string;
 
+  @Column({ nullable: true })
+  video_public_id: string | null;
+
   @Column({ type: "text" })
   description: string;
 

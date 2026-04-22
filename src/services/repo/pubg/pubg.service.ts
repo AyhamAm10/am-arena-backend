@@ -4,6 +4,7 @@ import { DeepPartial } from "typeorm";
 
 type CreatePubgGameParams = {
   image: string;
+  image_public_id?: string | null;
   type: PubgType | string;
   map: string;
 };
@@ -18,6 +19,7 @@ export class PubgService extends RepoService<PubgGame> {
     return await super.create({
       type,
       image: data.image,
+      image_public_id: data.image_public_id ?? null,
       map: data.map,
     });
   }

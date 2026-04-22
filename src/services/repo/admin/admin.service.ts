@@ -1,4 +1,4 @@
-import { ILike } from "typeorm";
+import { ILike, In } from "typeorm";
 import { AppDataSource } from "../../../config/data_source";
 import { Ensure } from "../../../common/errors/Ensure.handler";
 import { User } from "../../../entities/User";
@@ -10,6 +10,8 @@ import { ReelComment } from "../../../entities/ReelComment";
 import { Tournament } from "../../../entities/Tournament";
 import { Achievement } from "../../../entities/Achievement";
 import { PubgGame } from "../../../entities/PubgGame";
+import { Wallet } from "../../../entities/wallet";
+import { WalletTransaction } from "../../../entities/wallet_transaction";
 import type {
   GetAdminUsersQueryDto,
   UpdateAdminUserBalanceDto,
@@ -27,6 +29,8 @@ import type {
 import { PubgRegistrationField } from "../../../entities/PubgRegistrationField";
 import { NotificationService } from "../notification/notification.service";
 import { HighlightService } from "../achievement/highlight.service";
+import { mapPubgGameForResponse } from "../../../utils/pubg-game-response";
+import { mediaResponseUrl } from "../../../utils/media-url";
 import {
   decodeSuperTournamentDescription,
   encodeSuperTournamentDescription,
@@ -80,14 +84,52 @@ export class AdminService {
   }
 
   async updateUserBalance(userId: number, dto: UpdateAdminUserBalanceDto) {
-    const repo = AppDataSource.getRepository(User);
-    const user = await repo.findOneBy({ id: userId });
-    Ensure.exists(user, "user");
+    return AppDataSource.manager.transaction(async (manager) => {
+      const userRepo = manager.getRepository(User);
+      const walletRepo = manager.getRepository(Wallet);
+      const txRepo = manager.getRepository(WalletTransaction);
+      const user = await userRepo
+        .createQueryBuilder("user")
+        .setLock("pessimistic_write")
+        .where("user.id = :id", { id: userId })
+        .getOne();
+      Ensure.exists(user, "user");
 
-    user.coins = Number(user.coins || 0) + Number(dto.coins_delta || 0);
-    user.xp_points = Number(user.xp_points || 0) + Number(dto.xp_delta || 0);
+      const coinsDelta = Number(dto.coins_delta || 0);
+      const xpDelta = Number(dto.xp_delta || 0);
+      const nextCoins = Number(user!.coins || 0) + coinsDelta;
+      Ensure.custom(nextCoins >= 0, "User balance cannot become negative");
 
-    return repo.save(user);
+      user!.coins = nextCoins;
+      user!.xp_points = Number(user!.xp_points || 0) + xpDelta;
+      await userRepo.save(user!);
+
+      if (coinsDelta !== 0) {
+        let wallet = await walletRepo.findOne({
+          where: { user: { id: userId } } as any,
+          relations: ["user"],
+        });
+        if (!wallet) {
+          wallet = walletRepo.create({
+            user: { id: userId } as User,
+            balance: Number(user!.coins || 0),
+          });
+        } else {
+          wallet.balance = Number(user!.coins || 0);
+        }
+        await walletRepo.save(wallet);
+        await txRepo.save(
+          txRepo.create({
+            user: { id: userId } as User,
+            amount: Math.abs(coinsDelta),
+            type: coinsDelta > 0 ? "deposit" : "spend",
+            status: "approved",
+          }),
+        );
+      }
+
+      return user;
+    });
   }
 
   async getDashboardStats() {
@@ -132,7 +174,6 @@ export class AdminService {
   async listChannels(page = 1, limit = 50) {
     const skip = (page - 1) * limit;
     const chatRepo = AppDataSource.getRepository(Chat);
-    const chatMemberRepo = AppDataSource.getRepository(ChatMember);
     const [channels, total] = await chatRepo.findAndCount({
       where: { type: ChatType.CHANNEL },
       order: { created_at: "DESC" },
@@ -141,22 +182,30 @@ export class AdminService {
       relations: ["created_by", "tournament"],
     });
 
-    const data = await Promise.all(
-      channels.map(async (channel) => {
-        const memberCount = await chatMemberRepo.count({
-          where: { chat: { id: channel.id } },
-        });
+    const memberCounts = new Map<number, number>();
+    if (channels.length > 0) {
+      const counts = await AppDataSource.getRepository(ChatMember)
+        .createQueryBuilder("member")
+        .select("member.chat_id", "chat_id")
+        .addSelect("COUNT(*)", "member_count")
+        .where("member.chat_id IN (:...chatIds)", {
+          chatIds: channels.map((channel) => channel.id),
+        })
+        .groupBy("member.chat_id")
+        .getRawMany<{ chat_id: string; member_count: string }>();
+      for (const row of counts) {
+        memberCounts.set(Number(row.chat_id), Number(row.member_count));
+      }
+    }
 
-        return {
-          id: channel.id,
-          title: channel.title,
-          allow_user_messages: channel.allow_user_messages,
-          tournament_id: channel.tournament?.id ?? null,
-          member_count: memberCount,
-          created_at: channel.created_at,
-        };
-      }),
-    );
+    const data = channels.map((channel) => ({
+      id: channel.id,
+      title: channel.title,
+      allow_user_messages: channel.allow_user_messages,
+      tournament_id: channel.tournament?.id ?? null,
+      member_count: memberCounts.get(channel.id) ?? 0,
+      created_at: channel.created_at,
+    }));
 
     return { data, total, page, limit };
   }
@@ -355,7 +404,7 @@ export class AdminService {
 
   async updateReelAsAdmin(
     reelId: number,
-    payload: Partial<Pick<Reel, "title" | "description" | "video_url">> & {
+    payload: Partial<Pick<Reel, "title" | "description" | "video_url" | "video_public_id">> & {
       mentioned_user_ids?: number[];
       actorUserId?: number;
     }
@@ -372,7 +421,10 @@ export class AdminService {
         actorUserId: payload.actorUserId,
       });
     }
-    return saved;
+    return {
+      ...saved,
+      video_url: mediaResponseUrl(saved.video_url),
+    };
   }
 
   async deleteReelAsAdmin(reelId: number) {
@@ -386,8 +438,6 @@ export class AdminService {
 
   async listSuperTournaments(page = 1, limit = 50) {
     const tournamentRepo = AppDataSource.getRepository(Tournament);
-    const gameRepo = AppDataSource.getRepository(PubgGame);
-    const fieldsRepo = AppDataSource.getRepository(PubgRegistrationField);
     const skip = (page - 1) * limit;
     const [tournaments, total] = await tournamentRepo.findAndCount({
       where: { game_type: "super_pubg" },
@@ -396,25 +446,50 @@ export class AdminService {
       take: limit,
     });
 
-    const data = await Promise.all(
-      tournaments.map(async (tournament) => {
-        const game = await gameRepo.findOneBy({ id: tournament.game_ref_id });
-        const registrationFields = await fieldsRepo.find({
-          where: { tournament: { id: tournament.id } },
-        });
-        const { description, min_xp_required } = decodeSuperTournamentDescription(
-          tournament.description,
-        );
-
-        return {
-          ...tournament,
-          description,
-          min_xp_required,
-          game,
-          registration_fields: registrationFields,
-        };
-      }),
+    const tournamentIds = tournaments.map((tournament) => tournament.id);
+    const gameIds = Array.from(
+      new Set(tournaments.map((tournament) => Number(tournament.game_ref_id)).filter(Boolean))
     );
+    const [games, registrationFields] = await Promise.all([
+      gameIds.length > 0
+        ? AppDataSource.getRepository(PubgGame).find({
+            where: { id: In(gameIds) },
+          })
+        : [],
+      tournamentIds.length > 0
+        ? AppDataSource.getRepository(PubgRegistrationField).find({
+            where: { tournament: { id: In(tournamentIds) } } as any,
+            relations: ["tournament"],
+          })
+        : [],
+    ]);
+    const gamesById = new Map<number, PubgGame>();
+    for (const game of games) {
+      gamesById.set(Number(game.id), game);
+    }
+    const fieldsByTournamentId = new Map<number, PubgRegistrationField[]>();
+    for (const field of registrationFields) {
+      const tournamentId = Number((field.tournament as Tournament | undefined)?.id);
+      const existing = fieldsByTournamentId.get(tournamentId) ?? [];
+      existing.push(field);
+      fieldsByTournamentId.set(tournamentId, existing);
+    }
+
+    const data = tournaments.map((tournament) => {
+      const { description, min_xp_required } = decodeSuperTournamentDescription(
+        tournament.description,
+      );
+
+      return {
+        ...tournament,
+        description,
+        min_xp_required,
+        game: mapPubgGameForResponse(
+          gamesById.get(Number(tournament.game_ref_id)) ?? null,
+        ),
+        registration_fields: fieldsByTournamentId.get(tournament.id) ?? [],
+      };
+    });
 
     return { data, total, page, limit };
   }
@@ -429,6 +504,7 @@ export class AdminService {
         type: dto.game.type as PubgGame["type"],
         map: dto.game.map,
         image: dto.game.image || "",
+        image_public_id: dto.game.image_public_id ?? null,
       } as Partial<PubgGame>),
     );
 
@@ -491,6 +567,9 @@ export class AdminService {
       }
       if (dto.game.image !== undefined) {
         game.image = dto.game.image;
+      }
+      if (dto.game.image_public_id !== undefined) {
+        game.image_public_id = dto.game.image_public_id;
       }
 
       await gameRepo.save(game);

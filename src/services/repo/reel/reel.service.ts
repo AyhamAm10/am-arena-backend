@@ -7,11 +7,13 @@ import { RepoService } from "../../repo.service";
 import { GetReelsQueryDto } from "../../../dto/reel/get-reels-query.dto";
 import { HighlightService } from "../achievement/highlight.service";
 import { serializeUserAccount } from "../../../utils/serialize-user";
+import { mediaResponseUrl } from "../../../utils/media-url";
 
 export type ReelFeedItem = {
   id: number;
   title: string;
   video_url: string;
+  video_public_id?: string | null;
   description: string;
   created_at: Date;
   updated_at: Date;
@@ -35,6 +37,7 @@ export class ReelService extends RepoService<Reel> {
   async createReel(params: {
     title: string;
     video_url: string;
+    video_public_id?: string | null;
     description: string;
     userId: number;
     mentioned_user_ids?: number[];
@@ -42,6 +45,7 @@ export class ReelService extends RepoService<Reel> {
     const reel = await this.create({
       title: params.title,
       video_url: params.video_url,
+      video_public_id: params.video_public_id ?? null,
       description: params.description,
       user: { id: params.userId } as any,
     } as any);
@@ -50,12 +54,26 @@ export class ReelService extends RepoService<Reel> {
       mentionedUserIds: params.mentioned_user_ids ?? [],
       actorUserId: params.userId,
     });
-    return reel;
+    return {
+      ...reel,
+      video_url: mediaResponseUrl((reel as Reel).video_url),
+    };
   }
 
   async getReels(query: GetReelsQueryDto) {
     const { page = 1, limit = 10 } = query;
-    return await this.getAllWithPagination({ page, limit, order: { created_at: "DESC" } as any });
+    const result = await this.getAllWithPagination({
+      page,
+      limit,
+      order: { created_at: "DESC" } as any,
+    });
+    return {
+      ...result,
+      data: (result.data as Reel[]).map((r) => ({
+        ...r,
+        video_url: mediaResponseUrl(r.video_url),
+      })),
+    };
   }
 
   async getReelsForFeed(
@@ -98,7 +116,8 @@ export class ReelService extends RepoService<Reel> {
       return {
         id: r.id,
         title: r.title,
-        video_url: r.video_url,
+        video_url: mediaResponseUrl(r.video_url),
+        video_public_id: r.video_public_id ?? null,
         description: r.description,
         created_at: r.created_at,
         updated_at: r.updated_at,
@@ -130,13 +149,20 @@ export class ReelService extends RepoService<Reel> {
   async updateReelByOwner(
     reelId: number,
     userId: number,
-    params: { title?: string; description?: string; video_url?: string; mentioned_user_ids?: number[] }
+    params: {
+      title?: string;
+      description?: string;
+      video_url?: string;
+      video_public_id?: string | null;
+      mentioned_user_ids?: number[];
+    }
   ) {
     await this.assertReelOwnedByUser(reelId, userId);
     const patch: Record<string, unknown> = {};
     if (params.title !== undefined) patch.title = params.title;
     if (params.description !== undefined) patch.description = params.description;
     if (params.video_url !== undefined) patch.video_url = params.video_url;
+    if (params.video_public_id !== undefined) patch.video_public_id = params.video_public_id;
     const updated = await this.update(reelId, patch as any);
     if (params.mentioned_user_ids !== undefined) {
       await new HighlightService().syncReelHighlights({
@@ -145,7 +171,10 @@ export class ReelService extends RepoService<Reel> {
         actorUserId: userId,
       });
     }
-    return updated;
+    return {
+      ...(updated as Reel),
+      video_url: mediaResponseUrl((updated as Reel).video_url),
+    };
   }
 
   async deleteReelByOwner(reelId: number, userId: number) {

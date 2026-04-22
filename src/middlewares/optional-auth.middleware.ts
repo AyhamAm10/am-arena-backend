@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/data_source";
 import { User } from "../entities/User";
 import { JwtService } from "../services/jwt/jwt.service";
-import { resolveDashboardRoleUser } from "./dashboard-role.middleware";
 
 /**
  * Sets `req.currentUser` when a valid Bearer token is present; otherwise continues
@@ -10,19 +9,10 @@ import { resolveDashboardRoleUser } from "./dashboard-role.middleware";
  */
 export const optionalAuthMiddleware = async (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
-    const dashboardUser = await resolveDashboardRoleUser(
-      req.headers["x-dashboard-role"] as string | undefined
-    );
-
-    if (dashboardUser) {
-      req.currentUser = dashboardUser.id;
-      return next();
-    }
-
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next();
@@ -36,7 +26,7 @@ export const optionalAuthMiddleware = async (
     let decoded: { userId?: number };
     try {
       decoded = JwtService.verifyAccessToken(accessToken) as { userId?: number };
-    } catch (error: unknown) {
+    } catch {
       return next();
     }
 
@@ -47,8 +37,9 @@ export const optionalAuthMiddleware = async (
 
     const user = await AppDataSource.getRepository(User).findOne({
       where: { id: userId },
+      select: ["id", "is_active"],
     });
-    if (user?.id != null) {
+    if (user?.id != null && user.is_active) {
       req.currentUser = user.id;
     }
 

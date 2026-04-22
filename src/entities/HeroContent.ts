@@ -14,6 +14,9 @@ export class HeroContent {
   @Column()
   image: string;
 
+  @Column({ nullable: true })
+  image_public_id: string | null;
+
   @Column()
   title: string;
 

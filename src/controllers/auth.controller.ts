@@ -10,6 +10,10 @@ import { AuthLoginDto, authLoginSchema } from "../dto/auth/auth-login.dto";
 import { AuthRefreshDto, authRefreshSchema } from "../dto/auth/auth-refresh.dto";
 import { serializeUserAccount } from "../utils/serialize-user";
 
+function shouldExposeRefreshToken(req: Request) {
+  return false;
+}
+
 export class AuthController {
   constructor() {
     this.register = this.register.bind(this);
@@ -44,13 +48,21 @@ export class AuthController {
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
+      const responseData: {
+        user: ReturnType<typeof serializeUserAccount>;
+        accessToken: string;
+        refreshToken?: string;
+      } = {
+        user: serializeUserAccount(user as any),
+        accessToken,
+      };
+      if (shouldExposeRefreshToken(req)) {
+        responseData.refreshToken = refreshToken;
+      }
+
       return res.status(HttpStatusCode.CREATED).json(
         ApiResponse.success(
-          {
-            user: serializeUserAccount(user as any),
-            accessToken,
-            refreshToken,
-          },
+          responseData,
           ErrorMessages.generateErrorMessage("user", "created", lang)
         )
       );
@@ -80,13 +92,21 @@ export class AuthController {
         maxAge: 30 * 24 * 60 * 60 * 1000,
       });
 
+      const responseData: {
+        user: ReturnType<typeof serializeUserAccount>;
+        accessToken: string;
+        refreshToken?: string;
+      } = {
+        user: serializeUserAccount(user as any),
+        accessToken,
+      };
+      if (shouldExposeRefreshToken(req)) {
+        responseData.refreshToken = refreshToken;
+      }
+
       return res.json(
         ApiResponse.success(
-          {
-            user: serializeUserAccount(user as any),
-            accessToken,
-            refreshToken,
-          },
+          responseData,
           ErrorMessages.generateErrorMessage("user", "logged in", lang)
         )
       );
@@ -120,6 +140,11 @@ export class AuthController {
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
       const lang = (req.headers["accept-language"] as Language) || "en";
+      const userId = (req as any).currentUser;
+      if (userId) {
+        const authService = new AuthService();
+        await authService.revokeRefreshToken(Number(userId));
+      }
       res.clearCookie("refreshToken");
       return res.json(
         ApiResponse.success(

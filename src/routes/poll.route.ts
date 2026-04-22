@@ -4,6 +4,7 @@ import { authMiddleware } from "../middlewares/auth.middleware";
 import { optionalAuthMiddleware } from "../middlewares/auth.middleware";
 import { checkRole } from "../middlewares/role.middleware";
 import { UserRole } from "../entities/User";
+import { voteStrictRateLimiter } from "../middlewares/rate-limit/rate-limiters";
 
 const pollRouter = Router();
 const pollController = new PollController();
@@ -13,7 +14,12 @@ pollRouter.get("/tournament/:tournamentId", optionalAuthMiddleware, pollControll
 pollRouter.get("/chat/:chatId", optionalAuthMiddleware, pollController.getChatPolls);
 pollRouter.get("/", optionalAuthMiddleware, pollController.listPolls);
 pollRouter.get("/:id", optionalAuthMiddleware, pollController.getPollById);
-pollRouter.post("/:id/vote", authMiddleware, pollController.castVote);
+pollRouter.post(
+  "/:id/vote",
+  authMiddleware,
+  voteStrictRateLimiter,
+  pollController.castVote
+);
 
 pollRouter.post(
   "/admin",

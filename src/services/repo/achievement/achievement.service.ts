@@ -8,8 +8,12 @@ import { UserAchievementService } from "../user-achievement/user-achievement.ser
 import { UserService } from "../user/user.service";
 import { NotificationService } from "../notification/notification.service";
 import { AchievementProgressService } from "./achievement-progress.service";
+import { mediaResponseUrl } from "../../../utils/media-url";
 
-type CreateAchievementParams = CreateAchievementDto & { icon_url?: string };
+type CreateAchievementParams = CreateAchievementDto & {
+  icon_url?: string;
+  icon_public_id?: string | null;
+};
 
 export class AchievementService extends RepoService<Achievement> {
   constructor() {
@@ -29,25 +33,34 @@ export class AchievementService extends RepoService<Achievement> {
       params.logic_type !== "progress" || (params.target != null && Number(params.target) > 0),
       "Progress achievements require a target",
     );
-    return await this.create({
+    const created = await this.create({
       name: params.name,
       description: params.description,
       color_theme: params.color_theme ?? null,
       icon_url: params.icon_url,
+      icon_public_id: params.icon_public_id ?? null,
       xp_reward: params.xp_reward ?? 0,
       type: params.type,
       logic_type: params.logic_type,
       target: params.target ?? null,
     } as any);
+    return {
+      ...created,
+      icon_url: mediaResponseUrl((created as Achievement).icon_url),
+    };
   }
 
-  async updateAchievement(id: string | number, params: UpdateAchievementDto) {
+  async updateAchievement(
+    id: string | number,
+    params: UpdateAchievementDto & { icon_public_id?: string | null }
+  ) {
     const current = (await this.getById(id)) as Achievement;
     const data: any = {};
     if (params.name !== undefined) data.name = params.name;
     if (params.description !== undefined) data.description = params.description;
     if (params.color_theme !== undefined) data.color_theme = params.color_theme;
     if (params.icon_url !== undefined) data.icon_url = params.icon_url;
+    if (params.icon_public_id !== undefined) data.icon_public_id = params.icon_public_id;
     if (params.xp_reward !== undefined) data.xp_reward = params.xp_reward;
     if (params.type !== undefined) data.type = params.type;
     if (params.logic_type !== undefined) data.logic_type = params.logic_type;
@@ -57,8 +70,15 @@ export class AchievementService extends RepoService<Achievement> {
       const target = params.target !== undefined ? params.target : current.target ?? null;
       Ensure.custom(target != null && Number(target) > 0, "Progress achievements require a target");
     }
-    if (Object.keys(data).length === 0) return await this.getById(id);
-    return await this.update(id, data);
+    if (Object.keys(data).length === 0) {
+      const row = (await this.getById(id)) as Achievement;
+      return { ...row, icon_url: mediaResponseUrl(row.icon_url) };
+    }
+    const updated = await this.update(id, data);
+    return {
+      ...(updated as Achievement),
+      icon_url: mediaResponseUrl((updated as Achievement).icon_url),
+    };
   }
 
   async deleteAchievement(id: string | number) {
@@ -124,6 +144,7 @@ export class AchievementService extends RepoService<Achievement> {
     if (userId == null || achievements.length === 0) {
       return achievements.map((achievement) => ({
         ...achievement,
+        icon_url: mediaResponseUrl(achievement.icon_url),
         current: 0,
         target: achievement.target ?? null,
         percentage: 0,
@@ -149,6 +170,7 @@ export class AchievementService extends RepoService<Achievement> {
       const progress = progressService.getProgress(achievement, stats, Boolean(row));
       return {
         ...achievement,
+        icon_url: mediaResponseUrl(achievement.icon_url),
         ...progress,
         displayed: row?.displayed ?? false,
       };

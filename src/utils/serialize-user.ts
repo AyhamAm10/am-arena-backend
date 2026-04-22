@@ -1,16 +1,24 @@
 import { User } from "../entities/User";
+import { mediaResponseUrl } from "./media-url";
 
 type UserLike = Partial<User> & {
   id: number;
   full_name?: string;
   gamer_name?: string;
+  email?: string;
+  phone?: string | null;
+  role?: string;
+  is_active?: boolean;
+  coins?: number | string;
+  xp_points?: number | string;
   profile_picture_url?: string | null;
   avatar_public_id?: string | null;
+  created_at?: Date | string;
 };
 
 export function serializeAvatarFields(user: Pick<UserLike, "profile_picture_url" | "avatar_public_id">) {
   return {
-    avatarUrl: user.profile_picture_url ?? null,
+    avatarUrl: mediaResponseUrl(user.profile_picture_url ?? "") || null,
     avatarPublicId: user.avatar_public_id ?? null,
   };
 }
@@ -24,9 +32,31 @@ export function serializeUserRef(user: UserLike) {
   };
 }
 
-export function serializeUserAccount(user: UserLike) {
+/** Safe public profile — never password_hash, tokens, or push tokens. */
+export function serializeUserPublic(user: UserLike) {
+  const created =
+    user.created_at instanceof Date
+      ? user.created_at.toISOString()
+      : user.created_at
+        ? String(user.created_at)
+        : undefined;
+
   return {
-    ...user,
+    id: user.id,
+    full_name: user.full_name ?? "",
+    gamer_name: user.gamer_name ?? "",
+    email: user.email ?? "",
+    phone: user.phone ?? null,
+    role: user.role ?? "user",
+    is_active: user.is_active ?? true,
+    coins: Number(user.coins ?? 0),
+    xp_points: Number(user.xp_points ?? 0),
     ...serializeAvatarFields(user),
+    ...(created ? { created_at: created } : {}),
   };
+}
+
+/** Same as serializeUserPublic — kept for existing imports. */
+export function serializeUserAccount(user: UserLike) {
+  return serializeUserPublic(user);
 }

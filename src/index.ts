@@ -1,7 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import * as path from "path";
 import http from "http";
 import cookieParser from "cookie-parser";
 import qs from "qs";
@@ -11,7 +10,6 @@ import { logger } from "./logging/logger";
 import { AppDataSource } from "./config/data_source";
 import { errorHandler } from "./common/errors/error.handler";
 // import passport from "./utils/passport";
-import fs from "fs";
 import { swaggerDoc } from "./utils/swaggerOptions";
 import { langMiddleware } from "./middlewares/lang.middleware";
 import "reflect-metadata";
@@ -27,25 +25,62 @@ import chatRouter from "./routes/chat.route";
 import adminRouter from "./routes/admin.route";
 import notificationRouter from "./routes/notification.route";
 import pollRouter from "./routes/poll.route";
+import walletRouter from "./routes/wallet.route";
+import packageRouter from "./routes/package.route";
+import paymentRouter from "./routes/payment.route";
 // import { registerChatGateway } from "./socket/chat.gateway";
-import { setIO } from "./socket/io";
+import { configureSocketAdapter, setIO } from "./socket/io";
 import { registerChatGateway } from "./socket/chat.gateway";
+import {
+  assertRateLimitRedisOrExit,
+  globalRateLimiter,
+} from "./middlewares/rate-limit/rate-limiters";
+import { assertJwtSecretsOrExit } from "./config/jwt.env";
+import { assertCloudinaryConfigOrExit } from "./services/cloudinary.service";
+
 dotenv.config();
+assertJwtSecretsOrExit();
+assertRateLimitRedisOrExit();
+assertCloudinaryConfigOrExit();
+
 const app = express();
 const httpServer = http.createServer(app);
 
+if (process.env.TRUST_PROXY === "1") {
+  app.set("trust proxy", 1);
+}
+
 const corsOriginsEnv = process.env.CORS_ORIGINS?.trim();
-const corsOrigin =
+const configuredCorsOrigins =
   corsOriginsEnv && corsOriginsEnv.length > 0
     ? corsOriginsEnv.split(",").map((o) => o.trim()).filter(Boolean)
-    : true;
+    : [];
+
+if (Environment.isProduction() && configuredCorsOrigins.length === 0) {
+  logger.error(
+    "CORS_ORIGINS is required in production. Refusing to start with wildcard origins."
+  );
+  process.exit(1);
+}
+
+const corsOrigin =
+  configuredCorsOrigins.length > 0
+    ? configuredCorsOrigins
+    : Environment.isProduction()
+      ? []
+      : true;
 
 app.use(
   cors({
     origin: corsOrigin,
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Accept-Language", "x-dashboard-role"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Accept-Language",
+      "X-Refresh-Token-Delivery",
+    ],
   })
 );
 
@@ -54,36 +89,13 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(passport.initialize());
 app.set("query parser", (str) => qs.parse(str));
 
-function ensureWritableDir(dir: string) {
-  fs.mkdirSync(dir, { recursive: true });
-
-  const testFile = path.join(dir, ".write-test");
-  try {
-    fs.writeFileSync(testFile, "ok");
-    fs.unlinkSync(testFile);
-  } catch (e) {
-    throw new Error(`Uploads dir not writable: ${dir}`);
-  }
-}
-const uploadsDir = path.resolve(process.cwd(), "public/uploads");
-const iconsDir = path.resolve(process.cwd(), "public/icons");
-
-try {
-  ensureWritableDir(uploadsDir);
-  ensureWritableDir(iconsDir);
-} catch (e) {
-  logger.error(e);
-  process.exit(1);
-}
-
-// app.use("/image", express.static(path.join(process.cwd(), "public/uploads")));
-app.use("/image", express.static(uploadsDir));
-app.use("/icons", express.static(iconsDir));
 app.use(cookieParser());
 // Apply language middleware before routes
 app.use(langMiddleware);
 
 const router = express.Router();
+router.use(globalRateLimiter);
+
 router.get("/", (req, res) => {
   res.send("Our awesome Web API is online!");
 });
@@ -99,6 +111,9 @@ router.use("/chat", chatRouter);
 router.use("/admin", adminRouter);
 router.use("/notification", notificationRouter);
 router.use("/poll", pollRouter);
+router.use("/wallet", walletRouter);
+router.use("/package", packageRouter);
+router.use("/payment", paymentRouter);
 
 app.use(process.env.BASE_URL ?? "/", router);
 
@@ -115,9 +130,12 @@ const io = new SocketIOServer(httpServer, {
 });
 
 setIO(io);
+void configureSocketAdapter(io);
 registerChatGateway(io);
 
-swaggerDoc(app);
+if (!Environment.isProduction()) {
+  swaggerDoc(app);
+}
 
 logger.info(`NODE_ENV: ${Environment.toString()}`);
 
@@ -137,7 +155,7 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
       }
 
       httpServer.listen(PORT, "0.0.0.0", () => {
-        logger.info(`Server running at http://localhost:${PORT}`);
+        logger.info(`Server running on 0.0.0.0:${PORT}`);
       });
     })
     .catch((error: Error) => {

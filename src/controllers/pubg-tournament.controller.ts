@@ -15,6 +15,7 @@ import { ApiResponse } from "../common/responses/api.response";
 import { HttpStatusCode } from "../common/errors/api.error";
 import { ErrorMessages } from "../common/errors/ErrorMessages";
 import { validator } from "../common/errors/validator";
+import { BadRequestError } from "../common/errors/http.error";
 import { CreatePubgTournamentDto, createPubgTournamentSchema } from "../dto/pubg-tournament/create-pubg-tournament.dto";
 import { UpdatePubgTournamentDto, updatePubgTournamentSchema } from "../dto/pubg-tournament/update-pubg-tournament.dto";
 import {
@@ -27,14 +28,21 @@ import { PubgTournamentService } from "../services/repo/pubg-tournament/pubg-tou
 
 function normalizeMultipartTournamentBody(body: Request["body"]) {
   const normalized = { ...body } as Record<string, unknown>;
+  const parseJsonField = (value: unknown, field: string) => {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new BadRequestError(`${field} must be valid JSON`);
+    }
+  };
 
-  if (typeof normalized.game === "string") {
-    normalized.game = JSON.parse(normalized.game);
-  }
+  normalized.game = parseJsonField(normalized.game, "game");
 
-  if (typeof normalized.registration_fields === "string") {
-    normalized.registration_fields = JSON.parse(normalized.registration_fields);
-  }
+  normalized.registration_fields = parseJsonField(
+    normalized.registration_fields,
+    "registration_fields"
+  );
 
   if (typeof normalized.notify_all_users === "string") {
     normalized.notify_all_users = normalized.notify_all_users === "true";
@@ -75,6 +83,9 @@ export class PubgTournamentController {
         ...dto,
         createdById: userId,
         image: (req.file?.path as string) || dto.game.image || "",
+        image_public_id: req.file
+          ? ((req.file.filename as string) || null)
+          : (dto.game.image_public_id ?? null),
       });
 
       return res.status(HttpStatusCode.CREATED).json(
@@ -104,6 +115,7 @@ export class PubgTournamentController {
               game: {
                 ...(dto.game || {}),
                 image: req.file.path as string,
+                image_public_id: (req.file.filename as string) || null,
               },
             }
           : {}),

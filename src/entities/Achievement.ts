@@ -31,6 +31,9 @@ export class Achievement {
   @Column()
   icon_url: string;
 
+  @Column({ nullable: true })
+  icon_public_id: string | null;
+
   @Column({ type: "int", default: 0 })
   xp_reward: number;
 

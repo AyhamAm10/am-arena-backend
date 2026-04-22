@@ -27,9 +27,13 @@ export class ChatController {
         getChannelsQuerySchema,
         req.query
       )) as GetChannelsQueryDto;
+      const currentUserId = req.currentUser;
 
       const chatService = new ChatService();
-      const { data, total, page, limit } = await chatService.listChats(dto);
+      const { data, total, page, limit } = await chatService.listChats(
+        dto,
+        currentUserId,
+      );
 
       return res.json(
         ApiResponse.success(
@@ -52,9 +56,11 @@ export class ChatController {
       const lang = (req.headers["accept-language"] as Language) || "en";
       const params = await validator(adminIdParamsSchema, req.params);
       const query = await validator(getMessagesQuerySchema, req.query);
+      const currentUserId = req.currentUser;
 
       const { data, total, page, limit } = await this.messageService.listByChat(
         params.id,
+        currentUserId,
         query.page,
         query.limit,
       );

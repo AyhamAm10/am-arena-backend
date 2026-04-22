@@ -22,6 +22,10 @@ function ensureConfigured() {
   configured = true;
 }
 
+export function assertCloudinaryConfigOrExit() {
+  ensureConfigured();
+}
+
 export class CloudinaryService {
   async destroyImage(publicId: string) {
     const trimmed = publicId.trim();
@@ -29,5 +33,13 @@ export class CloudinaryService {
 
     ensureConfigured();
     await cloudinary.uploader.destroy(trimmed, { resource_type: "image" });
+  }
+
+  async destroyVideo(publicId: string) {
+    const trimmed = publicId.trim();
+    if (!trimmed) return;
+
+    ensureConfigured();
+    await cloudinary.uploader.destroy(trimmed, { resource_type: "video" });
   }
 }

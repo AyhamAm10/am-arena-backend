@@ -18,7 +18,6 @@ import { ReelCommentService } from "../services/repo/reel-comment/reel-comment.s
 import { ReelLikeService } from "../services/repo/reel-like/reel-like.service";
 import { TagService } from "../services/repo/achievement/tag.service";
 import { Ensure } from "../common/errors/Ensure.handler";
-import { imageUrl } from "../utils/handle-generate-url";
 
 export class ReelController {
   constructor() {
@@ -46,6 +45,7 @@ export class ReelController {
       const result = await reelService.createReel({
         title: dto.title,
         video_url: req.reelVideoUrl || dto.video_url || "",
+        video_public_id: req.reelVideoPublicId,
         description: dto.description,
         userId,
         mentioned_user_ids: dto.mentioned_user_ids,
@@ -97,7 +97,8 @@ export class ReelController {
 
       await validator(updateReelSchema, req.body);
       const dto = req.body as UpdateReelDto;
-      const newVideoUrl = req.file ? imageUrl(req.file.filename) : dto.video_url;
+      const newVideoUrl = req.file ? (req.file.path as string) : dto.video_url;
+      const newVideoPublicId = req.file ? (req.file.filename as string) : undefined;
       Ensure.custom(
         newVideoUrl !== undefined || dto.title !== undefined || dto.description !== undefined,
         "At least one of title, description, or video must be provided"
@@ -108,6 +109,7 @@ export class ReelController {
         title: dto.title,
         description: dto.description,
         video_url: newVideoUrl,
+        ...(req.file ? { video_public_id: newVideoPublicId ?? null } : {}),
         mentioned_user_ids: dto.mentioned_user_ids,
       });
 

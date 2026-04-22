@@ -7,12 +7,14 @@ const gameSchema = yup.object({
   type: yup.string().oneOf(pubgTypeEnum).required(),
   map: yup.string().required(),
   image: yup.string().optional().default(""),
+  image_public_id: yup.string().optional().nullable(),
 });
 
 const partialGameSchema = yup.object({
   type: yup.string().oneOf(pubgTypeEnum).optional(),
   map: yup.string().optional(),
   image: yup.string().optional(),
+  image_public_id: yup.string().optional().nullable(),
 });
 
 const registrationFieldSchema = yup.object({

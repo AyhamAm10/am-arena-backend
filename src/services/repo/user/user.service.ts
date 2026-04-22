@@ -18,6 +18,7 @@ import {
   serializeAvatarFields,
   serializeUserAccount,
 } from "../../../utils/serialize-user";
+import { mediaResponseUrl } from "../../../utils/media-url";
 
 const PROFILE_WON_TOURNAMENTS_LIMIT = 3;
 const TOURNAMENT_HISTORY_LIMIT = 3;
@@ -32,7 +33,8 @@ function serializeAchievement(achievement: Achievement | null | undefined) {
     name: achievement.name,
     description: achievement.description,
     color_theme: achievement.color_theme,
-    icon_url: achievement.icon_url,
+    icon_url: mediaResponseUrl(achievement.icon_url),
+    icon_public_id: achievement.icon_public_id ?? null,
     xp_reward: achievement.xp_reward,
     type: achievement.type,
     logic_type: achievement.logic_type,

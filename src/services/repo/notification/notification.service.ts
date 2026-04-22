@@ -11,6 +11,7 @@ import { ChatMemberService } from "../chat-member/chat-member.service";
 import { In } from "typeorm";
 import type { CreateAdminNotificationDto } from "../../../dto/admin/admin-notification.dto";
 import { Friend } from "../../../entities/Friend";
+import { getIO } from "../../../socket/io";
 
 function dedupePositiveUserIds(ids: readonly number[]): number[] {
   const seen = new Set<number>();
@@ -143,7 +144,7 @@ export class NotificationService extends RepoService<UserNotification> {
   }
 
   async createForUser(userId: number, payload: CreatePayload) {
-    return await this.create({
+    const created = await this.create({
       user: { id: userId } as any,
       type: payload.type,
       title: payload.title,
@@ -151,6 +152,8 @@ export class NotificationService extends RepoService<UserNotification> {
       data: payload.data,
       read_at: null,
     } as any);
+    this.emitRealtimeToUsers([userId], [created]);
+    return created;
   }
 
   async createForUsers(userIds: number[], payload: CreatePayload) {
@@ -165,7 +168,31 @@ export class NotificationService extends RepoService<UserNotification> {
         read_at: null as Date | null,
       })
     );
-    await this.repo.save(rows);
+    const created = await this.repo.save(rows);
+    this.emitRealtimeToUsers(userIds, created);
+  }
+
+  private emitRealtimeToUsers(userIds: number[], rows: UserNotification[]) {
+    const io = getIO();
+    if (!io || userIds.length === 0 || rows.length === 0) return;
+
+    for (let i = 0; i < userIds.length; i += 1) {
+      const userId = Number(userIds[i]);
+      const row = rows[i];
+      if (!Number.isInteger(userId) || userId <= 0 || !row) continue;
+      io.to(`user:${userId}`).emit("notification:new", {
+        id: row.id,
+        type: row.type,
+        title: row.title,
+        body: row.body,
+        data: row.data ?? {},
+        read_at: row.read_at ? row.read_at.toISOString() : null,
+        created_at:
+          row.created_at instanceof Date
+            ? row.created_at.toISOString()
+            : String(row.created_at),
+      });
+    }
   }
 
   private async sendPushToUsers(
