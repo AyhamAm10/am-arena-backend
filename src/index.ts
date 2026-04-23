@@ -56,24 +56,35 @@ const configuredCorsOrigins =
     ? corsOriginsEnv.split(",").map((o) => o.trim()).filter(Boolean)
     : [];
 
-if (Environment.isProduction() && configuredCorsOrigins.length === 0) {
+const strictProductionCors = process.env.STRICT_PRODUCTION_CORS === "1";
+
+if (
+  strictProductionCors &&
+  Environment.isProduction() &&
+  configuredCorsOrigins.length === 0
+) {
   logger.error(
     "CORS_ORIGINS is required in production. Refusing to start with wildcard origins."
   );
   process.exit(1);
 }
 
-const corsOrigin =
-  configuredCorsOrigins.length > 0
+// TEMPORARY: permissive CORS for development/testing. Restrict before production deployment.
+const useTemporaryWildcardCors =
+  !strictProductionCors || !Environment.isProduction();
+
+const corsOrigin = useTemporaryWildcardCors
+  ? "*"
+  : configuredCorsOrigins.length > 0
     ? configuredCorsOrigins
-    : Environment.isProduction()
-      ? []
-      : true;
+    : [];
+
+const corsCredentials = corsOrigin === "*" ? false : true;
 
 app.use(
   cors({
     origin: corsOrigin,
-    credentials: true,
+    credentials: corsCredentials,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
@@ -124,7 +135,7 @@ const PORT = Number(process.env.PORT) || 5000;
 const io = new SocketIOServer(httpServer, {
   cors: {
     origin: corsOrigin,
-    credentials: true,
+    credentials: corsCredentials,
     methods: ["GET", "POST"],
   },
 });

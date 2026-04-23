@@ -14,7 +14,7 @@ export class Chat {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'enum', enum: ChatType })
+  @Column({ type: 'simple-enum', enum: ChatType })
   type: ChatType;
 
   @Column({ nullable: true })

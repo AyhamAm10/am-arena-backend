@@ -1,5 +1,5 @@
 // src/entities/User.ts
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany, ManyToOne } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn, UpdateDateColumn, ManyToMany, ManyToOne, OneToOne, JoinColumn } from "typeorm";
 
 import { Message } from './Message';
 import { Chat } from './Chat';
@@ -10,6 +10,9 @@ import { Friend } from './Friend';
 import { UserAchievement } from './UserAchievement';
 import { UserNotification } from './UserNotification';
 import { Achievement } from "./Achievement";
+import { Wallet } from "./wallet";
+import { WalletTransaction } from "./wallet_transaction";
+import { Payment } from "./payment";
 
 
 export enum UserRole {
@@ -41,10 +44,13 @@ export class User {
   @Column({ unique: true })
   phone: string;
 
+  @Column({ nullable: true })
+  country: string | null;
+
   @Column()
   password_hash: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.USER })
+  @Column({ type: 'simple-enum', enum: UserRole, default: UserRole.USER })
   role: UserRole;
 
   @Column({ default: true })
@@ -59,9 +65,19 @@ export class User {
   @Column({ type: 'text', nullable: true })
   expo_push_token: string | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: 'datetime2', nullable: true })
   expo_push_token_updated_at: Date | null;
 
+  
+
+  @OneToMany(() => Payment, (payment) => payment.user)
+  payments: Payment[];
+
+  @OneToOne(() => Wallet, (wallet) => wallet.user)
+  wallet: Wallet;
+
+  @OneToMany(() => WalletTransaction, (tx) => tx.user)
+  wallet_transactions: WalletTransaction[];
   @CreateDateColumn()
   created_at: Date;
 

@@ -11,7 +11,9 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate ./src/migrations/test -d ./src/config/data_source.ts",
     "migration:prod": "typeorm migration:run -d ./build/config/data_source.js",
     "schema:drop": "typeorm-ts-node-commonjs schema:drop -d ./src/config/data_source.ts",
-    "schema:sync": "typeorm-ts-node-commonjs schema:sync -d ./src/config/data_source.ts"
+    "schema:sync": "typeorm-ts-node-commonjs schema:sync -d ./src/config/data_source.ts",
+    "azure:create-files": "typeorm-ts-node-commonjs migration:generate ./src/migrations/AzureInitialSchema -d ./src/config/data_source.ts",
+    "azure:push-db": "typeorm-ts-node-commonjs migration:run -d ./src/config/data_source.ts"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +33,7 @@
     "ioredis": "^5.10.1",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.3",
+    "mssql": "^12.5.0",
     "multer": "^2.1.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",

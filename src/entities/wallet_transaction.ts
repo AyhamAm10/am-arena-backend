@@ -17,13 +17,13 @@ export class WalletTransaction {
   amount: number; 
 
   @Column({
-    type: "enum",
+    type: "simple-enum",
     enum: ["deposit", "spend", "refund"],
   })
   type: "deposit" | "spend" | "refund";
 
   @Column({
-    type: "enum",
+    type: "simple-enum",
     enum: ["pending", "approved", "rejected"],
     default: "pending",
   })

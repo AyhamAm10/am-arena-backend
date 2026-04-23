@@ -49,7 +49,7 @@ function shouldUseDbSsl() {
 }
 
 export const AppDataSource = new DataSource({
-  type: "postgres",
+  type: "mssql",
   host: requiredEnv("DB_HOST", DB_HOST),
   port: Number(requiredEnv("DB_PORT", DB_PORT)),
   username: requiredEnv("DB_USER", DB_USER),
@@ -57,13 +57,20 @@ export const AppDataSource = new DataSource({
   database: requiredEnv("DB_NAME", DB_NAME),
   synchronize: false,
   logging: false,
-  schema: "public",
-  ssl: shouldUseDbSsl()
-    ? {
-        rejectUnauthorized:
-          process.env.DB_SSL_REJECT_UNAUTHORIZED?.trim() !== "0",
-      }
-    : false,
+  // schema: "public",
+  // ssl: shouldUseDbSsl()
+  //   ? {
+  //       rejectUnauthorized:
+  //         process.env.DB_SSL_REJECT_UNAUTHORIZED?.trim() !== "0",
+  //     }
+  //   : false,
+  options: {
+    encrypt: true, 
+    trustServerCertificate: true, 
+    // أضف الخيارين التاليين لحل مشكلة قطع الاتصال
+    // requestTimeout: 30000,
+    enableArithAbort: true  
+  },
   entities: [
     Achievement,
     Chat,

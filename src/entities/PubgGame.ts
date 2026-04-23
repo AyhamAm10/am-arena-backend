@@ -12,7 +12,7 @@ export class PubgGame {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'enum', enum: PubgType })
+  @Column({ type: 'simple-enum', enum: PubgType })
   type: PubgType;
 
   @Column()

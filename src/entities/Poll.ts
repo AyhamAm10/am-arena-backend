@@ -24,13 +24,13 @@ export class Poll {
     @Column({ type: "text", default: "" })
     description: string;
 
-    @Column({ type: 'enum', enum: ['tournament', 'global', 'message'] })
+    @Column({ type: 'simple-enum', enum: ['tournament', 'global', 'message'] })
     type: 'tournament' | 'global' | 'message';
 
-    @ManyToOne(() => Tournament, (t) => t.polls, { nullable: true, onDelete: 'CASCADE' })
+    @ManyToOne(() => Tournament, (t) => t.polls, { nullable: true, onDelete: 'SET NULL' })
     tournament: Tournament | null;
 
-    @ManyToOne(() => Chat, { nullable: true, onDelete: "CASCADE" })
+    @ManyToOne(() => Chat, { nullable: true, onDelete: "SET NULL" })
     @JoinColumn({ name: "chatId" })
     chat: Chat | null;
 
@@ -38,7 +38,7 @@ export class Poll {
     @JoinColumn({ name: "messageId" })
     message: Message | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @Column({ type: 'datetime2', nullable: true })
     expires_at: Date | null;
 
     @CreateDateColumn()

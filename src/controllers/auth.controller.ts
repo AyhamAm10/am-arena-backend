@@ -34,6 +34,7 @@ export class AuthController {
       const { user, accessToken, refreshToken } = await authService.register({
         email: dto.email,
         full_name: dto.full_name,
+        country: dto.country,
         password: dto.password,
         phone: dto.phone,
         gamer_name: dto.gamer_name,

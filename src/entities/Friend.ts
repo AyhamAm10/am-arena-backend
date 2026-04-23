@@ -24,7 +24,7 @@ export class Friend {
   friend: User;
 
 
-  @Column({ type: 'enum', enum: FriendStatus, default: FriendStatus.PENDING })
+  @Column({ type: 'simple-enum', enum: FriendStatus, default: FriendStatus.PENDING })
   status: FriendStatus;
 
   @CreateDateColumn()

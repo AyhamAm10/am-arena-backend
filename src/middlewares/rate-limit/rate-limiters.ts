@@ -37,23 +37,15 @@ function createRedisStore(): RedisStore | undefined {
 }
 
 /**
- * Ensures Redis is available when required (production).
+ * Startup notice for HTTP rate limiting backing. Never exits the process.
  */
 export function assertRateLimitRedisOrExit(): void {
   if (Environment.isTest()) {
     return;
   }
-  if (Environment.isProduction() && !process.env.REDIS_URL?.trim()) {
-    logger.error(
-      "REDIS_URL is required in production for rate limiting. Refusing to start."
-    );
-    process.exit(1);
-  }
-  if (!Environment.isProduction() && !process.env.REDIS_URL?.trim()) {
-    logger.warn(
-      "REDIS_URL is not set — rate limits use in-memory store (development only)."
-    );
-  }
+  logger.info(
+    "HTTP rate limiting uses the in-memory store (Redis is not used in this process)."
+  );
 }
 
 function baseOptions(): Partial<Options> {

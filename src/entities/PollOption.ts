@@ -15,16 +15,16 @@ export class PollOption {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Poll, (poll) => poll.options, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Poll, (poll) => poll.options, { onDelete: 'NO ACTION' })
   poll: Poll;
 
   @Column({ nullable: true })
   label: string;
 
-  @Column({ type: 'enum', enum: ['text', 'user'] })
+  @Column({ type: 'simple-enum', enum: ['text', 'user'] })
   type: 'text' | 'user';
 
-  @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: "userId" })
   user: User | null;
 

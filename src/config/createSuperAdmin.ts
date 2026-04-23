@@ -38,6 +38,7 @@ export const createSuperAdmin = async () => {
       email,
       full_name: "Admin",
       gamer_name: "Admin",
+      country: process.env.SUPERADMIN_COUNTRY || "Unknown",
       password_hash: hashedPassword,
       role: UserRole.SUPER_ADMIN,
       is_active: true,

@@ -24,7 +24,7 @@ export class Payment {
   coins: number;
 
   @Column({
-    type: "enum",
+    type: "simple-enum",
     enum: ["pending", "approved", "rejected"],
     default: "pending",
   })
@@ -39,7 +39,7 @@ export class Payment {
   @ManyToOne(() => User, { nullable: true })
   approved_by: User;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: "datetime2", nullable: true })
   approved_at: Date;
 
   @OneToMany(() => WalletTransaction, (tx) => tx.payment)

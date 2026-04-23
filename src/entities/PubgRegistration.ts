@@ -14,7 +14,7 @@ export class PubgRegistration {
   @Column({ nullable: true })
   payment_method: string;
 
-  @Column({ type: "timestamp" })
+  @Column({ type: "datetime2" })
   registered_at: Date;
 
   @ManyToOne(() => Tournament)
@@ -30,8 +30,6 @@ export class PubgRegistration {
     inverseJoinColumn: { name: "friend_id", referencedColumnName: "id" },
   })
   friends: User[];
-
-  
 
   @UpdateDateColumn()
   updated_at: Date;

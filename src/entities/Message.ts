@@ -16,12 +16,12 @@ export class Message {
   @Column('text')
   content: string;
 
-  @Column({ type: 'enum', enum: ['text', 'cta', 'poll', 'navigation'] , default: 'text'})
+  @Column({ type: 'simple-enum', enum: ['text', 'cta', 'poll', 'navigation'] , default: 'text'})
 
   type: 'text' | 'cta' | 'poll' | 'navigation';
 
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   data: Record<string, any>;
 
   @Column({ default: true })

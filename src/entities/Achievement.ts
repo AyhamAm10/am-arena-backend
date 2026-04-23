@@ -41,13 +41,13 @@ export class Achievement {
   repeatable: boolean;
 
   @Column({
-    type: 'enum',
+    type: 'simple-enum',
     enum: AchievementType,
     default: AchievementType.CUSTOM
   })
   type: AchievementType;
 
-  @Column({ type: "enum", enum: ["progress", "event", "manual"], default: "manual" })
+  @Column({ type: "simple-enum", enum: ["progress", "event", "manual"], default: "manual" })
   logic_type: "progress" | "event" | "manual";
 
   @Column({ type: "int", nullable: true })

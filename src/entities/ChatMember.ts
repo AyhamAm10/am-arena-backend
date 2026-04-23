@@ -10,11 +10,11 @@ export class ChatMember {
   @PrimaryColumn()
   user_id: number;
 
-  @ManyToOne(() => Chat, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Chat, { onDelete: 'NO ACTION' })
   @JoinColumn({ name: 'chat_id' })
   chat: Chat;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'NO ACTION' })
   @JoinColumn({ name: 'user_id' })
   user: User;
 

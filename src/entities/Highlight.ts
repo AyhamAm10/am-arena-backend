@@ -14,7 +14,7 @@ export class Highlight {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @ManyToOne(() => User, { onDelete: "NO ACTION" })
   @JoinColumn({ name: "user_id" })
   user: User;
 
@@ -22,10 +22,10 @@ export class Highlight {
   @JoinColumn({ name: "tournament_id" })
   tournament: Tournament | null;
 
-  @ManyToOne(() => Reel, { nullable: true, onDelete: "CASCADE" })
+  @ManyToOne(() => Reel, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "reel_id" })
   reel: Reel | null;
 
-  @CreateDateColumn({ type: "timestamptz" })
+  @CreateDateColumn({ type: "datetime2" })
   created_at: Date;
 }

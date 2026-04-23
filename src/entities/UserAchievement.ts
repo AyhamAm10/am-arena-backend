@@ -13,7 +13,7 @@ export class UserAchievement {
   @ManyToOne(() => Achievement, achievement => achievement.user_achievements)
   achievement: Achievement;
 
-  @Column({ type: "timestamp" })
+  @Column({ type: "datetime2" })
   obtained_at: Date;
 
   @Column({ default: false })

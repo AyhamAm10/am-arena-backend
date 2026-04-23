@@ -14,7 +14,7 @@ import { createHash } from "crypto";
 
 type RegisterParams = Pick<
   AuthRegisterDto,
-  "email" | "password" | "full_name" | "gamer_name" | "phone" | "avatarUrl" | "avatarPublicId"
+  "email" | "password" | "full_name" | "gamer_name" | "country" | "phone" | "avatarUrl" | "avatarPublicId"
 >;
 type LoginParams = Pick<AuthLoginDto, "email" | "password">;
 const refreshTokenFallbackStore = new Map<number, string>();
@@ -89,7 +89,7 @@ export class AuthService extends RepoService<User> {
   }
 
   async register(params: RegisterParams) {
-    const { full_name , gamer_name , phone , avatarUrl , avatarPublicId , email, password } = params;
+    const { full_name , gamer_name , country, phone , avatarUrl , avatarPublicId , email, password } = params;
     const currentLang = getLanguage();
     
     const existingUser = await this.findOneByCondition({ email });
@@ -103,6 +103,7 @@ export class AuthService extends RepoService<User> {
       password_hash: hashedPassword,
       full_name , 
       gamer_name,
+      country,
       phone,
       profile_picture_url: avatarUrl,
       avatar_public_id: avatarPublicId
@@ -128,7 +129,7 @@ export class AuthService extends RepoService<User> {
     // Find user with password field included
     const user = await this.repo.findOne({ 
       where: { email },
-      select: ['id', 'achievements', "password_hash", 'email', 'coins', 'role', 'full_name', 'gamer_name', 'is_active', 'profile_picture_url', 'avatar_public_id']
+      select: ['id', 'achievements', "password_hash", 'email', 'coins', 'role', 'full_name', 'gamer_name', 'country', 'is_active', 'profile_picture_url', 'avatar_public_id']
     });
     Ensure.exists(user, "user");
     if (!user!.is_active) {

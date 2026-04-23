@@ -12,7 +12,7 @@ export class PubgRegistrationField {
   @Column()
   label: string;
 
-  @Column({ type: "enum", enum: ["string","number","boolean","select"] })
+  @Column({ type: "simple-enum", enum: ["string","number","boolean","select"] })
   type: "string" | "number" | "boolean" | "select";
 
   @Column({ type: "text", nullable: true })

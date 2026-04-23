@@ -7,6 +7,7 @@ type UserLike = Partial<User> & {
   gamer_name?: string;
   email?: string;
   phone?: string | null;
+  country?: string | null;
   role?: string;
   is_active?: boolean;
   coins?: number | string;
@@ -47,6 +48,7 @@ export function serializeUserPublic(user: UserLike) {
     gamer_name: user.gamer_name ?? "",
     email: user.email ?? "",
     phone: user.phone ?? null,
+    country: user.country ?? null,
     role: user.role ?? "user",
     is_active: user.is_active ?? true,
     coins: Number(user.coins ?? 0),
