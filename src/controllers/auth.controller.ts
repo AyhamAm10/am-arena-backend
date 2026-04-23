@@ -10,8 +10,13 @@ import { AuthLoginDto, authLoginSchema } from "../dto/auth/auth-login.dto";
 import { AuthRefreshDto, authRefreshSchema } from "../dto/auth/auth-refresh.dto";
 import { serializeUserAccount } from "../utils/serialize-user";
 
+/**
+ * Web can use httpOnly cookies; React Native cannot rely on cookies for refresh.
+ * Clients that send `X-Refresh-Token-Delivery: body` receive the refresh token in JSON.
+ */
 function shouldExposeRefreshToken(req: Request) {
-  return false;
+  const mode = (req.get("X-Refresh-Token-Delivery") ?? "").trim().toLowerCase();
+  return mode === "body";
 }
 
 export class AuthController {
