@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import { logger } from "../logging/logger";
+import { formatErrorForLog } from "../logging/errorDiagnostics";
 
 let client: Redis | null = null;
 
@@ -23,7 +24,12 @@ export function getRedisClient(): Redis | null {
       enableReadyCheck: true,
     });
     client.on("error", (err) => {
-      logger.error("Redis client error:", err);
+      logger.log({
+        level: "error",
+        message: "redis_client_error",
+        event: "redis_client_error",
+        err: formatErrorForLog(err),
+      });
     });
   }
   return client;

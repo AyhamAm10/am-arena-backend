@@ -7,6 +7,7 @@ import qs from "qs";
 import { Server as SocketIOServer } from "socket.io";
 import { Environment } from "./environment";
 import { logger } from "./logging/logger";
+import { formatErrorForLog } from "./logging/errorDiagnostics";
 import { AppDataSource } from "./config/data_source";
 import { errorHandler } from "./common/errors/error.handler";
 // import passport from "./utils/passport";
@@ -162,7 +163,12 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
       try {
         await createSuperAdmin();
       } catch (error) {
-        logger.error("Failed to create super admin:", error);
+        logger.log({
+          level: "error",
+          message: "create_super_admin_failed",
+          event: "create_super_admin_failed",
+          err: formatErrorForLog(error),
+        });
       }
 
       httpServer.listen(PORT, "0.0.0.0", () => {
@@ -170,7 +176,12 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
       });
     })
     .catch((error: Error) => {
-      logger.error(error);
+      logger.log({
+        level: "error",
+        message: "database_init_failed",
+        event: "database_init_failed",
+        err: formatErrorForLog(error),
+      });
     });
 }
 

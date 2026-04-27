@@ -6,6 +6,7 @@ import { Chat } from "../entities/Chat";
 import { ChatMember } from "../entities/ChatMember";
 import { User } from "../entities/User";
 import { logger } from "../logging/logger";
+import { formatErrorForLog } from "../logging/errorDiagnostics";
 
 const SOCKET_RATE_LIMIT_WINDOW_MS = 60_000;
 const CONNECT_RATE_LIMIT = 40;
@@ -98,7 +99,14 @@ export function registerChatGateway(io: Server) {
         await socket.join(room);
         logger.info(`User ${userId} joined room ${room}`);
       } catch (err) {
-        logger.error("join-channel error:", err);
+        logger.log({
+          level: "error",
+          message: "socket_join_channel_error",
+          event: "socket_join_channel_error",
+          userId,
+          channelId,
+          err: formatErrorForLog(err),
+        });
         socket.emit("error-message", "Failed to join channel");
       }
     });
