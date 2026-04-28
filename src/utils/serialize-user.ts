@@ -1,4 +1,5 @@
 import { User } from "../entities/User";
+import { Achievement } from "../entities/Achievement";
 import { mediaResponseUrl } from "./media-url";
 
 type UserLike = Partial<User> & {
@@ -15,7 +16,26 @@ type UserLike = Partial<User> & {
   profile_picture_url?: string | null;
   avatar_public_id?: string | null;
   created_at?: Date | string;
+  selected_achievement?: Achievement | null;
 };
+
+function serializeSelectedAchievement(
+  achievement: Achievement | null | undefined
+) {
+  if (!achievement) return null;
+  return {
+    id: achievement.id,
+    name: achievement.name,
+    description: achievement.description,
+    color_theme: achievement.color_theme,
+    icon_url: mediaResponseUrl(achievement.icon_url),
+    icon_public_id: achievement.icon_public_id ?? null,
+    xp_reward: achievement.xp_reward,
+    type: achievement.type,
+    logic_type: achievement.logic_type,
+    target: achievement.target ?? null,
+  };
+}
 
 export function serializeAvatarFields(user: Pick<UserLike, "profile_picture_url" | "avatar_public_id">) {
   return {
@@ -54,6 +74,9 @@ export function serializeUserPublic(user: UserLike) {
     coins: Number(user.coins ?? 0),
     xp_points: Number(user.xp_points ?? 0),
     ...serializeAvatarFields(user),
+    selected_achievement: serializeSelectedAchievement(
+      user.selected_achievement ?? null
+    ),
     ...(created ? { created_at: created } : {}),
   };
 }
