@@ -22,7 +22,12 @@ import { mediaResponseUrl } from "../../../utils/media-url";
 
 const PROFILE_WON_TOURNAMENTS_LIMIT = 3;
 const TOURNAMENT_HISTORY_LIMIT = 3;
-const BEST_USER_RELATIONS = ["achievements", "achievements.achievement", "wonTournaments"] as const;
+const BEST_USER_RELATIONS = [
+  "achievements",
+  "achievements.achievement",
+  "wonTournaments",
+  "selected_achievement",
+] as const;
 
 type FriendStatusValue = "accepted" | "pending" | "blocked" | null;
 
@@ -135,6 +140,9 @@ export class UserService extends RepoService<User> {
         updated_at: user.updated_at,
         achievements: user.achievements ?? [],
         wonTournaments: user.wonTournaments ?? [],
+        selected_achievement: user.selected_achievement
+          ? serializeAchievement(user.selected_achievement)
+          : null,
       })),
       total,
       page,
