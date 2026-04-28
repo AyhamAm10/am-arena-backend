@@ -7,21 +7,26 @@ export class Message {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Chat, (chat) => chat.messages)
+  @ManyToOne(() => Chat, (chat) => chat.messages, { onDelete: "CASCADE" })
   chat: Chat;
 
-  @ManyToOne(() => User, (user) => user.messages)
+  @ManyToOne(() => User, (user) => user.messages, { onDelete: "CASCADE" })
   sender: User;
 
   @Column('text')
   content: string;
 
-  @Column({ type: 'simple-enum', enum: ['text', 'cta', 'poll', 'navigation'] , default: 'text'})
+  @Column({
+    type: "enum",
+    enum: ["text", "cta", "poll", "navigation"],
+    enumName: "message_type_enum",
+    default: "text",
+  })
 
   type: 'text' | 'cta' | 'poll' | 'navigation';
 
 
-  @Column({ type: 'simple-json', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   data: Record<string, any>;
 
   @Column({ default: true })

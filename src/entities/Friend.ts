@@ -15,16 +15,21 @@ export class Friend {
   @PrimaryColumn()
   friend_user_id: number;
 
-  @ManyToOne(() => User, (user) => user.friends)
+  @ManyToOne(() => User, (user) => user.friends, { onDelete: "CASCADE" })
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: 'friend_user_id' })
   friend: User;
 
 
-  @Column({ type: 'simple-enum', enum: FriendStatus, default: FriendStatus.PENDING })
+  @Column({
+    type: "enum",
+    enum: FriendStatus,
+    enumName: "friend_status_enum",
+    default: FriendStatus.PENDING,
+  })
   status: FriendStatus;
 
   @CreateDateColumn()

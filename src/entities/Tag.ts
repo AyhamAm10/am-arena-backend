@@ -20,22 +20,22 @@ export class Tag {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, { onDelete: "NO ACTION" })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user: User;
 
-  @ManyToOne(() => User, { onDelete: "NO ACTION" })
+  @ManyToOne(() => User, { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "creator_id" })
-  creator: User;
+  creator: User | null;
 
-  @ManyToOne(() => Reel, { onDelete: "NO ACTION" })
+  @ManyToOne(() => Reel, { onDelete: "CASCADE" })
   @JoinColumn({ name: "reel_id" })
   reel: Reel;
 
-  @ManyToOne(() => ReelComment, { onDelete: "NO ACTION" })
+  @ManyToOne(() => ReelComment, { onDelete: "CASCADE" })
   @JoinColumn({ name: "comment_id" })
   comment: ReelComment;
 
-  @CreateDateColumn({ type: "datetime2" })
+  @CreateDateColumn({ type: "timestamptz" })
   created_at: Date;
 }

@@ -19,15 +19,15 @@ export class Vote {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Poll, { onDelete: 'NO ACTION' })
+  @ManyToOne(() => Poll, { onDelete: "CASCADE" })
   @JoinColumn({ name: "pollId" })
   poll: Poll;
 
-  @ManyToOne(() => PollOption, (option) => option.votes, { onDelete: 'NO ACTION' })
+  @ManyToOne(() => PollOption, (option) => option.votes, { onDelete: "CASCADE" })
   @JoinColumn({ name: "optionId" })
   option: PollOption;
 
-  @ManyToOne(() => User, { onDelete: 'NO ACTION' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   @JoinColumn({ name: "userId" })
   user: User;
 

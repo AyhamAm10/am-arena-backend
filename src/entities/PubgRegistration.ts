@@ -14,20 +14,28 @@ export class PubgRegistration {
   @Column({ nullable: true })
   payment_method: string;
 
-  @Column({ type: "datetime2" })
+  @Column({ type: "timestamptz" })
   registered_at: Date;
 
-  @ManyToOne(() => Tournament)
+  @ManyToOne(() => Tournament, { onDelete: "CASCADE" })
   tournament: Tournament;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
   user: User;
 
   @ManyToMany(() => User)
   @JoinTable({
     name: "pubg_registration_friends", 
-    joinColumn: { name: "registration_id", referencedColumnName: "id" },
-    inverseJoinColumn: { name: "friend_id", referencedColumnName: "id" },
+    joinColumn: {
+      name: "registration_id",
+      referencedColumnName: "id",
+      foreignKeyConstraintName: "FK_pubg_registration_friends_registration",
+    },
+    inverseJoinColumn: {
+      name: "friend_id",
+      referencedColumnName: "id",
+      foreignKeyConstraintName: "FK_pubg_registration_friends_friend",
+    },
   })
   friends: User[];
 

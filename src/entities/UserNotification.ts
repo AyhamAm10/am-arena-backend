@@ -23,7 +23,7 @@ export class UserNotification {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (u) => u.notifications, { onDelete: "NO ACTION" })
+  @ManyToOne(() => User, (u) => u.notifications, { onDelete: "CASCADE" })
   @JoinColumn({ name: "user_id" })
   user: User;
 
@@ -36,12 +36,12 @@ export class UserNotification {
   @Column({ type: "text" })
   body: string;
 
-  @Column({ type: "simple-json", nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   data: Record<string, unknown> | null;
 
-  @Column({ type: "datetime2", nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   read_at: Date | null;
 
-  @CreateDateColumn({ type: "datetime2" })
+  @CreateDateColumn({ type: "timestamptz" })
   created_at: Date;
 }

@@ -50,7 +50,7 @@ export class User {
   @Column()
   password_hash: string;
 
-  @Column({ type: 'simple-enum', enum: UserRole, default: UserRole.USER })
+  @Column({ type: "enum", enum: UserRole, enumName: "user_role_enum", default: UserRole.USER })
   role: UserRole;
 
   @Column({ default: true })
@@ -65,7 +65,7 @@ export class User {
   @Column({ type: 'text', nullable: true })
   expo_push_token: string | null;
 
-  @Column({ type: 'datetime2', nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   expo_push_token_updated_at: Date | null;
 
   
@@ -106,8 +106,9 @@ export class User {
   @OneToMany(() => UserAchievement, (ua) => ua.user)
   achievements: UserAchievement[];
 
-  @ManyToOne(() => Achievement, { nullable: true })
-  selected_achievement: Achievement;
+  @ManyToOne(() => Achievement, { nullable: true, onDelete: "SET NULL" })
+  @JoinColumn({ name: "selected_achievement_id" })
+  selected_achievement: Achievement | null;
 
   @ManyToMany(() => Tournament, (tournament) => tournament.winners)
   wonTournaments: Tournament[];

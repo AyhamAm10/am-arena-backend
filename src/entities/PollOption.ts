@@ -15,13 +15,17 @@ export class PollOption {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Poll, (poll) => poll.options, { onDelete: 'NO ACTION' })
+  @ManyToOne(() => Poll, (poll) => poll.options, { onDelete: "CASCADE" })
   poll: Poll;
 
   @Column({ nullable: true })
   label: string;
 
-  @Column({ type: 'simple-enum', enum: ['text', 'user'] })
+  @Column({
+    type: "enum",
+    enum: ["text", "user"],
+    enumName: "poll_option_type_enum",
+  })
   type: 'text' | 'user';
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })

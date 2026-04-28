@@ -7,13 +7,13 @@ export class UserAchievement {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, user => user.achievements)
+  @ManyToOne(() => User, user => user.achievements, { onDelete: "CASCADE" })
   user: User;
 
-  @ManyToOne(() => Achievement, achievement => achievement.user_achievements)
+  @ManyToOne(() => Achievement, achievement => achievement.user_achievements, { onDelete: "CASCADE" })
   achievement: Achievement;
 
-  @Column({ type: "datetime2" })
+  @Column({ type: "timestamptz" })
   obtained_at: Date;
 
   @Column({ default: false })

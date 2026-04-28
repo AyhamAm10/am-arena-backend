@@ -24,7 +24,11 @@ export class Poll {
     @Column({ type: "text", default: "" })
     description: string;
 
-    @Column({ type: 'simple-enum', enum: ['tournament', 'global', 'message'] })
+    @Column({
+      type: "enum",
+      enum: ["tournament", "global", "message"],
+      enumName: "poll_type_enum",
+    })
     type: 'tournament' | 'global' | 'message';
 
     @ManyToOne(() => Tournament, (t) => t.polls, { nullable: true, onDelete: 'SET NULL' })
@@ -38,7 +42,7 @@ export class Poll {
     @JoinColumn({ name: "messageId" })
     message: Message | null;
 
-    @Column({ type: 'datetime2', nullable: true })
+    @Column({ type: "timestamptz", nullable: true })
     expires_at: Date | null;
 
     @CreateDateColumn()

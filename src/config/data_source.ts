@@ -30,7 +30,7 @@ import { Package } from "../entities/package";
 
 
 dotenv.config();
-const { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, NODE_ENV } =
+const { DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, NODE_ENV, DATABASE_URL } =
   process.env;
 
 function requiredEnv(name: string, value: string | undefined) {
@@ -41,36 +41,13 @@ function requiredEnv(name: string, value: string | undefined) {
   return trimmed;
 }
 
-function shouldUseDbSsl() {
-  const explicit = process.env.DB_SSL?.trim().toLowerCase();
-  if (explicit === "1" || explicit === "true") return true;
-  if (explicit === "0" || explicit === "false") return false;
-  return NODE_ENV === "production";
-}
 
 export const AppDataSource = new DataSource({
-  type: "mssql",
-  host: requiredEnv("DB_HOST", DB_HOST),
-  port: Number(requiredEnv("DB_PORT", DB_PORT)),
-  username: requiredEnv("DB_USER", DB_USER),
-  password: requiredEnv("DB_PASSWORD", DB_PASSWORD),
-  database: requiredEnv("DB_NAME", DB_NAME),
+  type: "postgres",
+  url:DATABASE_URL,
   synchronize: false,
-  logging: false,
-  // schema: "public",
-  // ssl: shouldUseDbSsl()
-  //   ? {
-  //       rejectUnauthorized:
-  //         process.env.DB_SSL_REJECT_UNAUTHORIZED?.trim() !== "0",
-  //     }
-  //   : false,
-  options: {
-    encrypt: true, 
-    trustServerCertificate: true, 
-    // أضف الخيارين التاليين لحل مشكلة قطع الاتصال
-    // requestTimeout: 30000,
-    enableArithAbort: true  
-  },
+  logging: true,
+  ssl: true,
   entities: [
     Achievement,
     Chat,

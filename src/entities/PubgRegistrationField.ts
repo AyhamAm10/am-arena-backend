@@ -6,17 +6,21 @@ export class PubgRegistrationField {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => Tournament)
+  @ManyToOne(() => Tournament, { onDelete: "CASCADE" })
   tournament: Tournament;
 
   @Column()
   label: string;
 
-  @Column({ type: "simple-enum", enum: ["string","number","boolean","select"] })
+  @Column({
+    type: "enum",
+    enum: ["string", "number", "boolean", "select"],
+    enumName: "pubg_registration_field_type_enum",
+  })
   type: "string" | "number" | "boolean" | "select";
 
   @Column({ type: "text", nullable: true })
-  options: string; // لو النوع select
+  options: string | null;
 
   @Column({ default: true })
   required: boolean;

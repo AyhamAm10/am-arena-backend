@@ -7,10 +7,10 @@ export class PubgRegistrationFieldValue {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => PubgRegistration)
+  @ManyToOne(() => PubgRegistration, { onDelete: "CASCADE" })
   registration: PubgRegistration;
 
-  @ManyToOne(() => PubgRegistrationField)
+  @ManyToOne(() => PubgRegistrationField, { onDelete: "CASCADE" })
   field: PubgRegistrationField;
 
   @Column()
