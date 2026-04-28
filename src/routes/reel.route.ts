@@ -22,7 +22,7 @@ reelRouter.get("/", optionalAuthMiddleware, reelController.getReels);
 reelRouter.post("/:id/comment", authMiddleware, reelController.addComment);
 reelRouter.get("/:id/comments", reelController.getReelComments);
 reelRouter.get("/tag-users/search", authMiddleware, reelController.searchTagUsers);
-reelRouter.post("/:id/like", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), reelController.likeReel);
+reelRouter.post("/:id/like", authMiddleware, reelController.likeReel);
 reelRouter.delete("/:id/like", authMiddleware, reelController.removeLike);
 reelRouter.patch(
   "/:id",
