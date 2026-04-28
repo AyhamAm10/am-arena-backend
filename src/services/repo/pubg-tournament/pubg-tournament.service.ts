@@ -25,6 +25,12 @@ import { Wallet } from "../../../entities/wallet";
 import { WalletTransaction } from "../../../entities/wallet_transaction";
 import { In } from "typeorm";
 import { mapPubgGameForResponse } from "../../../utils/pubg-game-response";
+import { Achievement, AchievementType } from "../../../entities/Achievement";
+import { Poll } from "../../../entities/Poll";
+import { PollOption } from "../../../entities/PollOption";
+import { Vote } from "../../../entities/Vote";
+import { AchievementService } from "../achievement/achievement.service";
+import { UserAchievementService } from "../user-achievement/user-achievement.service";
 
 type CreatePubgTournamentParams = CreatePubgTournamentDto & {
   createdById: number;
@@ -32,6 +38,22 @@ type CreatePubgTournamentParams = CreatePubgTournamentDto & {
   image_public_id?: string | null;
 };
 type UpdatePubgTournamentParams = UpdatePubgTournamentDto;
+
+const TOURNAMENT_CHAMPION_TEMPLATE = {
+  name: "سيد البطولة",
+  icon_url:
+    "https://res.cloudinary.com/dqonojdwr/image/upload/v1777388070/icons/1777388069285-svg-icon_-tournament-champion.svg",
+  icon_public_id: "icons/1777388069285-svg-icon_-tournament-champion",
+  color_theme: "#E9C400",
+} as const;
+
+const AUDIENCE_CHAMPION_TEMPLATE = {
+  name: "نجم التصويت",
+  icon_url:
+    "https://res.cloudinary.com/dqonojdwr/image/upload/v1777388664/icons/1777388663717-svg-icon_-audience-champion.svg",
+  icon_public_id: "icons/1777388663717-svg-icon_-audience-champion",
+  color_theme: "#10b981",
+} as const;
 
 function safeTournamentWinnerSummaries(
   winners: User[] | undefined
@@ -104,6 +126,8 @@ export class PubgTournamentService extends RepoService<Tournament> {
       allow_user_messages: true,
     } as any);
 
+    await this.ensureTournamentAutomation(tournament.id);
+
     if (params.notify_all_users) {
       const notificationService = new NotificationService();
       await notificationService.notifyTournamentCreated(tournament.id, tournament.title);
@@ -171,7 +195,8 @@ export class PubgTournamentService extends RepoService<Tournament> {
   }
 
   async getPubgTournament(id: string | number) {
-    const tournament = await this.getById(id) as Tournament;
+    let tournament = await this.getById(id) as Tournament;
+    tournament = await this.finalizeTournamentLifecycleIfNeeded(tournament);
 
     const pubgService = new PubgService();
     const game = await pubgService.getById(tournament.game_ref_id);
@@ -271,7 +296,13 @@ export class PubgTournamentService extends RepoService<Tournament> {
       );
     }
 
-    const rows = data.data.map((tournament: Tournament) => {
+    const normalizedRows = await Promise.all(
+      data.data.map(async (tournament: Tournament) =>
+        this.finalizeTournamentLifecycleIfNeeded(tournament)
+      )
+    );
+
+    const rows = normalizedRows.map((tournament: Tournament) => {
       const result: Record<string, unknown> = {
         ...tournament,
         registration_fields: fieldsByTournamentId.get(tournament.id) ?? [],
@@ -318,7 +349,8 @@ export class PubgTournamentService extends RepoService<Tournament> {
     fieldValues: { field_id: number; value: string }[],
     friends?: number[]
   ) {
-    const tournament = await this.getById(tournamentId) as Tournament;
+    let tournament = await this.getById(tournamentId) as Tournament;
+    tournament = await this.finalizeTournamentLifecycleIfNeeded(tournament);
     const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
     const pubgRegistrationFieldService = new PubgRegistrationFieldService();
     const pubgService = new PubgService();
@@ -359,7 +391,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
     const entryFee = Number(tournament.entry_fee) || 0;
 
-    return AppDataSource.manager.transaction(async (manager) => {
+    const registration = await AppDataSource.manager.transaction(async (manager) => {
       await manager.query(
         "SELECT pg_advisory_xact_lock($1::integer, $2::integer)",
         [tid, 0]
@@ -474,6 +506,9 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
       return registration;
     });
+
+    await this.ensureParticipantPollOption(tid, userId);
+    return registration;
   }
 
   async assignWinners(tournamentId: string | number, userIds: number[]) {
@@ -517,6 +552,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
       });
     }
 
+    await this.finalizeTournamentLifecycle(tid, userIds);
     return tournament;
   }
 
@@ -599,6 +635,239 @@ export class PubgTournamentService extends RepoService<Tournament> {
         } as any);
       }
     });
+  }
+
+  async ensureTournamentAutomation(tournamentId: number) {
+    const tournamentRepo = AppDataSource.getRepository(Tournament);
+    const achievementRepo = AppDataSource.getRepository(Achievement);
+    const pollRepo = AppDataSource.getRepository(Poll);
+    const optionRepo = AppDataSource.getRepository(PollOption);
+    const registrationRepo = AppDataSource.getRepository(PubgRegistration);
+
+    const tournament = await tournamentRepo.findOne({ where: { id: tournamentId } });
+    Ensure.exists(tournament, "tournament");
+
+    let changed = false;
+
+    if (!tournament!.champion_achievement_id) {
+      const achievementService = new AchievementService();
+      const created = (await achievementService.createAchievement({
+        name: TOURNAMENT_CHAMPION_TEMPLATE.name,
+        description: `قم بالانتصار في بطولة ${tournament!.title}`,
+        color_theme: TOURNAMENT_CHAMPION_TEMPLATE.color_theme,
+        icon_url: TOURNAMENT_CHAMPION_TEMPLATE.icon_url,
+        icon_public_id: TOURNAMENT_CHAMPION_TEMPLATE.icon_public_id,
+        type: AchievementType.CUSTOM,
+        logic_type: "manual",
+        xp_reward: 0,
+      })) as Achievement;
+      tournament!.champion_achievement_id = created.id;
+      changed = true;
+    } else {
+      const championAchievement = await achievementRepo.findOne({
+        where: { id: tournament!.champion_achievement_id },
+      });
+      Ensure.exists(championAchievement, "tournament champion achievement");
+    }
+
+    if (!tournament!.audience_achievement_id) {
+      const achievementService = new AchievementService();
+      const created = (await achievementService.createAchievement({
+        name: AUDIENCE_CHAMPION_TEMPLATE.name,
+        description: `حصل على أعلى تصويت جماهيري في بطولة ${tournament!.title}`,
+        color_theme: AUDIENCE_CHAMPION_TEMPLATE.color_theme,
+        icon_url: AUDIENCE_CHAMPION_TEMPLATE.icon_url,
+        icon_public_id: AUDIENCE_CHAMPION_TEMPLATE.icon_public_id,
+        type: AchievementType.CUSTOM,
+        logic_type: "manual",
+        xp_reward: 0,
+      })) as Achievement;
+      tournament!.audience_achievement_id = created.id;
+      changed = true;
+    } else {
+      const audienceAchievement = await achievementRepo.findOne({
+        where: { id: tournament!.audience_achievement_id },
+      });
+      Ensure.exists(audienceAchievement, "tournament audience achievement");
+    }
+
+    if (!tournament!.audience_poll_id) {
+      const poll = await pollRepo.save(
+        pollRepo.create({
+          title: `أفضل لاعب - ${tournament!.title}`,
+          description: `تصويت الجمهور لأفضل لاعب في بطولة ${tournament!.title}`,
+          type: "tournament",
+          tournament: { id: tournament!.id } as Tournament,
+          expires_at: tournament!.end_date ?? null,
+          is_active: true,
+        })
+      );
+      tournament!.audience_poll_id = poll.id;
+      changed = true;
+
+      const registrations = await registrationRepo.find({
+        where: { tournament: { id: tournament!.id } } as any,
+        relations: ["user"],
+      });
+      if (registrations.length > 0) {
+        const seen = new Set<number>();
+        const options = registrations
+          .map((row) => Number(row.user?.id))
+          .filter((userId) => Number.isInteger(userId) && userId > 0)
+          .filter((userId) => {
+            if (seen.has(userId)) return false;
+            seen.add(userId);
+            return true;
+          })
+          .map((userId) =>
+            optionRepo.create({
+              poll: { id: poll.id } as Poll,
+              type: "user",
+              user: { id: userId } as User,
+              label: null,
+            })
+          );
+        if (options.length > 0) {
+          await optionRepo.save(options);
+        }
+      }
+    } else {
+      const poll = await pollRepo.findOne({
+        where: { id: tournament!.audience_poll_id },
+      });
+      Ensure.exists(poll, "tournament audience poll");
+    }
+
+    if (changed) {
+      await tournamentRepo.save(tournament!);
+    }
+  }
+
+  async finalizeTournamentIfEnded(tournamentId: number) {
+    const tournament = await this.getById(tournamentId) as Tournament;
+    await this.finalizeTournamentLifecycleIfNeeded(tournament);
+  }
+
+  private async ensureParticipantPollOption(tournamentId: number, userId: number) {
+    const tournamentRepo = AppDataSource.getRepository(Tournament);
+    const pollOptionRepo = AppDataSource.getRepository(PollOption);
+    const tournament = await tournamentRepo.findOne({ where: { id: tournamentId } });
+    Ensure.exists(tournament, "tournament");
+
+    if (!tournament!.audience_poll_id) {
+      await this.ensureTournamentAutomation(tournamentId);
+    }
+
+    const refreshed = await tournamentRepo.findOne({ where: { id: tournamentId } });
+    Ensure.exists(refreshed, "tournament");
+    Ensure.exists(refreshed!.audience_poll_id, "tournament audience poll");
+
+    const existing = await pollOptionRepo.findOne({
+      where: {
+        poll: { id: refreshed!.audience_poll_id as number },
+        user: { id: userId },
+      } as any,
+    });
+    if (existing) return;
+
+    await pollOptionRepo.save(
+      pollOptionRepo.create({
+        poll: { id: refreshed!.audience_poll_id as number } as Poll,
+        type: "user",
+        user: { id: userId } as User,
+        label: null,
+      })
+    );
+  }
+
+  private async finalizeTournamentLifecycleIfNeeded(tournament: Tournament) {
+    if (!tournament.is_active) return tournament;
+    if (!tournament.end_date) return tournament;
+    const endAt = new Date(tournament.end_date).getTime();
+    if (Number.isNaN(endAt) || endAt > Date.now()) return tournament;
+
+    await this.finalizeTournamentLifecycle(tournament.id, []);
+    const refreshed = await this.getById(tournament.id) as Tournament;
+    return refreshed;
+  }
+
+  private async finalizeTournamentLifecycle(tournamentId: number, manualWinnerIds: number[]) {
+    await this.ensureTournamentAutomation(tournamentId);
+    const tournamentRepo = AppDataSource.getRepository(Tournament);
+    const pollRepo = AppDataSource.getRepository(Poll);
+    const voteRepo = AppDataSource.getRepository(Vote);
+    const achievementService = new AchievementService();
+    const userAchievementService = new UserAchievementService();
+
+    const tournament = await tournamentRepo.findOne({
+      where: { id: tournamentId },
+      relations: ["winners"],
+    });
+    Ensure.exists(tournament, "tournament");
+
+    if (tournament!.audience_poll_id) {
+      const poll = await pollRepo.findOne({ where: { id: tournament!.audience_poll_id } });
+      if (poll && poll.is_active) {
+        poll.is_active = false;
+        await pollRepo.save(poll);
+      }
+    }
+
+    if (tournament!.is_active) {
+      tournament!.is_active = false;
+      await tournamentRepo.save(tournament!);
+    }
+
+    const championAchievementId = tournament!.champion_achievement_id;
+    const audienceAchievementId = tournament!.audience_achievement_id;
+    Ensure.exists(championAchievementId, "champion achievement");
+    Ensure.exists(audienceAchievementId, "audience achievement");
+
+    const championWinnerId =
+      manualWinnerIds[0] ?? Number(tournament!.winners?.[0]?.id ?? 0);
+    if (championWinnerId > 0) {
+      const existingChampion = await userAchievementService.findByUserAndAchievement(
+        championWinnerId,
+        championAchievementId as number
+      );
+      if (!existingChampion) {
+        await achievementService.assignToUser(championAchievementId as number, championWinnerId);
+      }
+    }
+
+    if (tournament!.audience_poll_id) {
+      const topOptionRow = await voteRepo
+        .createQueryBuilder("vote")
+        .select('"vote"."optionId"', "optionId")
+        .addSelect("COUNT(*)", "count")
+        .where('"vote"."pollId" = :pollId', { pollId: tournament!.audience_poll_id })
+        .groupBy('"vote"."optionId"')
+        .orderBy("COUNT(*)", "DESC")
+        .addOrderBy('"vote"."optionId"', "ASC")
+        .limit(1)
+        .getRawOne<{ optionId: string }>();
+
+      if (topOptionRow?.optionId) {
+        const pollOptionRepo = AppDataSource.getRepository(PollOption);
+        const winningOption = await pollOptionRepo.findOne({
+          where: { id: Number(topOptionRow.optionId) },
+          relations: ["user"],
+        });
+        const audienceWinnerId = Number(winningOption?.user?.id ?? 0);
+        if (audienceWinnerId > 0) {
+          const existingAudience = await userAchievementService.findByUserAndAchievement(
+            audienceWinnerId,
+            audienceAchievementId as number
+          );
+          if (!existingAudience) {
+            await achievementService.assignToUser(
+              audienceAchievementId as number,
+              audienceWinnerId
+            );
+          }
+        }
+      }
+    }
   }
 
 }

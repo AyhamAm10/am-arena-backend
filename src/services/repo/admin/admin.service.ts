@@ -35,6 +35,7 @@ import {
   decodeSuperTournamentDescription,
   encodeSuperTournamentDescription,
 } from "../../../common/utils/super-tournament-description";
+import { PubgTournamentService } from "../pubg-tournament/pubg-tournament.service";
 
 const SYSTEM_NOTIFICATIONS_CHANNEL = "SYSTEM_NOTIFICATIONS";
 
@@ -539,6 +540,8 @@ export class AdminService {
         ),
       );
     }
+
+    await new PubgTournamentService().ensureTournamentAutomation(tournament.id);
 
     if (dto.notify_all_users) {
       const notificationService = new NotificationService();

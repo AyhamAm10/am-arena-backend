@@ -22,6 +22,7 @@ import { Vote } from "../../../entities/Vote";
 import { NotificationService } from "../notification/notification.service";
 import { RepoService } from "../../repo.service";
 import { serializeUserRef } from "../../../utils/serialize-user";
+import { PubgTournamentService } from "../pubg-tournament/pubg-tournament.service";
 
 type PollType = Poll["type"];
 type PollSummary = {
@@ -533,6 +534,7 @@ export class PollService extends RepoService<Poll> {
   }
 
   async getTournamentPolls(tournamentId: number, currentUserId?: number | null) {
+    await new PubgTournamentService().finalizeTournamentIfEnded(tournamentId);
     const polls = await this.pollRepo.find({
       where: { tournament: { id: tournamentId } } as any,
       relations: ["options", "options.user", "tournament", "chat", "message"],
@@ -578,9 +580,13 @@ export class PollService extends RepoService<Poll> {
 
   async castVote(pollId: number, optionId: number, userId: number) {
     const poll = await this.getPollEntityOrFail(pollId);
-    const option = poll.options.find((item) => item.id === optionId);
+    if (poll.tournament?.id) {
+      await new PubgTournamentService().finalizeTournamentIfEnded(poll.tournament.id);
+    }
+    const refreshedPoll = await this.getPollEntityOrFail(pollId);
+    const option = refreshedPoll.options.find((item) => item.id === optionId);
     Ensure.exists(option, "poll option");
-    await this.ensureUserCanVote(poll, userId);
+    await this.ensureUserCanVote(refreshedPoll, userId);
 
     const existingVote = await this.voteRepo.findOne({
       where: {
