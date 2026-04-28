@@ -3,6 +3,7 @@ import path from "path";
 import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
 import type { Request } from "express";
 import type { StorageEngine } from "multer";
+import type { UploadApiOptions } from "cloudinary";
 
 const imageMimeTypes = [
   "image/jpeg",
@@ -46,6 +47,10 @@ class CloudinaryStorage implements StorageEngine {
   constructor(
     private readonly folder: string,
     private readonly resourceType: "image" | "video",
+    private readonly options?: {
+      sanitizeSvg?: boolean;
+      optimizeRaster?: boolean;
+    },
   ) {}
 
   _handleFile(
@@ -59,13 +64,31 @@ class CloudinaryStorage implements StorageEngine {
     file.stream.on("error", (error) => cb(error));
     file.stream.on("end", () => {
       const buffer = Buffer.concat(chunks);
+      if (this.options?.sanitizeSvg && file.mimetype === "image/svg+xml") {
+        const validationError = validateSvgContent(buffer);
+        if (validationError) {
+          cb(validationError);
+          return;
+        }
+      }
       const publicId = sanitizeFilename(file.originalname).replace(/\.[^.]+$/, "");
+      const uploadOptions: UploadApiOptions = {
+        folder: this.folder,
+        resource_type: this.resourceType,
+        public_id: publicId,
+      };
+
+      const isRasterImage =
+        this.resourceType === "image" &&
+        file.mimetype !== "image/svg+xml" &&
+        file.mimetype.startsWith("image/");
+
+      if (this.options?.optimizeRaster && isRasterImage) {
+        uploadOptions.transformation = [{ quality: "auto", fetch_format: "auto" }];
+      }
+
       const upload = cloudinary.uploader.upload_stream(
-        {
-          folder: this.folder,
-          resource_type: this.resourceType,
-          public_id: publicId,
-        },
+        uploadOptions,
         (error, result) => {
           if (error || !result) {
             cb(error || new Error("Cloudinary upload failed"));
@@ -108,15 +131,47 @@ const imageFilter = (req, file, cb) => {
   }
 };
 
-const iconMimeTypes = [...imageMimeTypes];
+function validateSvgContent(buffer: Buffer): Error | null {
+  const svg = buffer.toString("utf8");
+  const normalized = svg.toLowerCase();
 
-/** Achievement icons: raster images only (SVG disabled for XSS hardening). */
+  const blockedPatterns: Array<{ pattern: RegExp; reason: string }> = [
+    { pattern: /<script\b/i, reason: "script tags are not allowed" },
+    { pattern: /\son[a-z]+\s*=/i, reason: "inline event handlers are not allowed" },
+    {
+      pattern: /\b(?:xlink:href|href)\s*=\s*["']\s*(?:https?:|\/\/|data:)/i,
+      reason: "external or data URL references are not allowed",
+    },
+    { pattern: /<foreignobject\b/i, reason: "foreignObject is not allowed" },
+  ];
+
+  for (const check of blockedPatterns) {
+    if (check.pattern.test(normalized)) {
+      return new Error(`Unsafe SVG file rejected: ${check.reason}.`);
+    }
+  }
+
+  if (!/<svg[\s>]/i.test(normalized)) {
+    return new Error("Invalid SVG file content.");
+  }
+
+  return null;
+}
+
+const iconMimeTypes = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/svg+xml",
+];
+
 const iconFileFilter = (req, file, cb) => {
   if (iconMimeTypes.includes(file.mimetype)) {
     cb(null, true);
     return;
   }
-  cb(new Error("Only raster image icon files are allowed!"), false);
+  cb(new Error("Only PNG, JPG, JPEG, WEBP, or SVG icon files are allowed!"), false);
 };
 
 const videoMimeTypes = [
@@ -135,8 +190,13 @@ const videoFilter = (req, file, cb) => {
   }
 };
 
-const imageStorage: StorageEngine = new CloudinaryStorage("uploads", "image");
-const iconStorage: StorageEngine = new CloudinaryStorage("icons", "image");
+const imageStorage: StorageEngine = new CloudinaryStorage("uploads", "image", {
+  optimizeRaster: true,
+});
+const iconStorage: StorageEngine = new CloudinaryStorage("icons", "image", {
+  sanitizeSvg: true,
+  optimizeRaster: true,
+});
 const videoStorage: StorageEngine = new CloudinaryStorage("reels", "video");
 
 export const uploadIcon = multer({
