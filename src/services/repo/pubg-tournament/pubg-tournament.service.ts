@@ -55,6 +55,13 @@ const AUDIENCE_CHAMPION_TEMPLATE = {
   color_theme: "#10b981",
 } as const;
 
+function autoAchievementXpFromTournament(tournament: Tournament): number {
+  const tournamentXp = Math.max(0, Math.trunc(Number(tournament.Xp_condition) || 0));
+  if (tournamentXp <= 0) return 0;
+  // Auto achievements get 0.2% from the tournament XP source.
+  return Math.max(1, Math.round(tournamentXp * 0.002));
+}
+
 function safeTournamentWinnerSummaries(
   winners: User[] | undefined
 ): { id: number; gamer_name: string }[] {
@@ -646,6 +653,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
     const tournament = await tournamentRepo.findOne({ where: { id: tournamentId } });
     Ensure.exists(tournament, "tournament");
+    const autoAchievementXp = autoAchievementXpFromTournament(tournament!);
 
     let changed = false;
 
@@ -659,7 +667,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
         icon_public_id: TOURNAMENT_CHAMPION_TEMPLATE.icon_public_id,
         type: AchievementType.CUSTOM,
         logic_type: "manual",
-        xp_reward: 0,
+        xp_reward: autoAchievementXp,
       })) as Achievement;
       tournament!.champion_achievement_id = created.id;
       changed = true;
@@ -680,7 +688,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
         icon_public_id: AUDIENCE_CHAMPION_TEMPLATE.icon_public_id,
         type: AchievementType.CUSTOM,
         logic_type: "manual",
-        xp_reward: 0,
+        xp_reward: autoAchievementXp,
       })) as Achievement;
       tournament!.audience_achievement_id = created.id;
       changed = true;
