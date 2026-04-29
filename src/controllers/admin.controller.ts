@@ -248,6 +248,7 @@ export class AdminController {
         senderId: currentUserId,
         contentPreview: dto.content,
         channelTitle: (result as { channel_title?: string }).channel_title,
+        messageId: (result as { id?: number }).id,
       });
 
       return res.status(HttpStatusCode.CREATED).json(

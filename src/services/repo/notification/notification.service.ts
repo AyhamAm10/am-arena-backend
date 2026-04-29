@@ -446,6 +446,7 @@ export class NotificationService extends RepoService<UserNotification> {
     senderId: number;
     contentPreview: string;
     channelTitle?: string;
+    messageId?: number;
   }) {
     const memberService = new ChatMemberService();
     const userIds = await memberService.getUserIdsByChatId(params.channelId);
@@ -462,6 +463,7 @@ export class NotificationService extends RepoService<UserNotification> {
       chatId: params.channelId,
       target: "chat",
       messagePreview: body,
+      ...(params.messageId != null ? { messageId: params.messageId } : {}),
     };
 
     try {
