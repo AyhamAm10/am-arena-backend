@@ -57,6 +57,9 @@ export class Tournament {
   @Column({ nullable: true })
   audience_poll_id: number | null;
 
+  @Column({ nullable: true })
+  survivor_achievement_id: number | null;
+
   @OneToMany(() => Poll, (poll) => poll.tournament)
   polls: Poll[];
 

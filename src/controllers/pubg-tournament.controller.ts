@@ -24,6 +24,10 @@ import {
 } from "../dto/pubg-tournament/get-pubg-tournaments-query.dto";
 import { RegisterForTournamentDto, registerForTournamentSchema } from "../dto/pubg-tournament/register-for-tournament.dto";
 import { AssignWinnersDto, assignWinnersSchema } from "../dto/pubg-tournament/assign-winners.dto";
+import {
+  AssignSurvivorsDto,
+  assignSurvivorsSchema,
+} from "../dto/pubg-tournament/assign-survivors.dto";
 import { PubgTournamentService } from "../services/repo/pubg-tournament/pubg-tournament.service";
 
 function normalizeMultipartTournamentBody(body: Request["body"]) {
@@ -61,6 +65,7 @@ export class PubgTournamentController {
     this.getRegistrationFields = this.getRegistrationFields.bind(this);
     this.registerForTournament = this.registerForTournament.bind(this);
     this.assignWinners = this.assignWinners.bind(this);
+    this.assignSurvivors = this.assignSurvivors.bind(this);
     this.getRegistrations = this.getRegistrations.bind(this);
     this.removeRegistration = this.removeRegistration.bind(this);
   }
@@ -259,6 +264,30 @@ export class PubgTournamentController {
         ApiResponse.success(
           tournament,
           ErrorMessages.generateErrorMessage("tournament winners", "created", lang)
+        )
+      );
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async assignSurvivors(req: Request, res: Response, next: NextFunction) {
+    try {
+      const lang = (req.headers["accept-language"] as Language) || "en";
+      await validator(assignSurvivorsSchema, req.body);
+      const dto = req.body as AssignSurvivorsDto;
+      const tournamentId = req.params.id as string;
+
+      const pubgTournamentService = new PubgTournamentService();
+      const tournament = await pubgTournamentService.assignSurvivors(
+        tournamentId,
+        dto.user_ids as number[]
+      );
+
+      return res.json(
+        ApiResponse.success(
+          tournament,
+          ErrorMessages.generateErrorMessage("tournament survivors", "created", lang)
         )
       );
     } catch (err) {

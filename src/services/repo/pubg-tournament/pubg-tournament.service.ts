@@ -55,11 +55,22 @@ const AUDIENCE_CHAMPION_TEMPLATE = {
   color_theme: "#10b981",
 } as const;
 
-function autoAchievementXpFromTournament(tournament: Tournament): number {
+const SURVIVOR_TEMPLATE = {
+  name: "سيد النجاة",
+  icon_url:
+    "https://res.cloudinary.com/dqonojdwr/image/upload/v1777464212/icons/1777464211089-svg.png",
+  icon_public_id: "icons/1777464211089-svg",
+  color_theme: "#00F2FF",
+} as const;
+
+function autoAchievementXpFromTournament(
+  tournament: Tournament,
+  ratePercent: number
+): number {
   const tournamentXp = Math.max(0, Math.trunc(Number(tournament.Xp_condition) || 0));
   if (tournamentXp <= 0) return 0;
-  // Auto achievements get 0.2% from the tournament XP source.
-  return Math.max(1, Math.round(tournamentXp * 0.002));
+  const ratio = Math.max(0, Number(ratePercent) || 0) / 100;
+  return Math.max(1, Math.round(tournamentXp * ratio));
 }
 
 function safeTournamentWinnerSummaries(
@@ -81,6 +92,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
     this.getRegistrationFields = this.getRegistrationFields.bind(this);
     this.registerForTournament = this.registerForTournament.bind(this);
     this.assignWinners = this.assignWinners.bind(this);
+    this.assignSurvivors = this.assignSurvivors.bind(this);
     this.getRegistrations = this.getRegistrations.bind(this);
     this.removeRegistration = this.removeRegistration.bind(this);
   }
@@ -563,6 +575,58 @@ export class PubgTournamentService extends RepoService<Tournament> {
     return tournament;
   }
 
+  async assignSurvivors(tournamentId: string | number, userIds: number[]) {
+    const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
+    const deduped = Array.from(
+      new Set(userIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))
+    );
+    Ensure.custom(deduped.length > 0, "At least one survivor is required");
+    Ensure.custom(deduped.length <= 5, "A maximum of five survivors is allowed");
+
+    const tournamentRepo = AppDataSource.getRepository(Tournament);
+    const tournament = await tournamentRepo.findOne({ where: { id: tid } });
+    Ensure.exists(tournament, "tournament");
+
+    await this.ensureTournamentAutomation(tid);
+    const refreshed = await tournamentRepo.findOne({ where: { id: tid } });
+    Ensure.exists(refreshed, "tournament");
+    Ensure.exists(refreshed!.survivor_achievement_id, "survivor achievement");
+
+    const registrations = await AppDataSource.getRepository(PubgRegistration).find({
+      where: {
+        tournament: { id: tid },
+        user: { id: In(deduped) },
+      } as any,
+      relations: ["user"],
+    });
+    const registeredUserIds = new Set(
+      registrations.map((registration) => Number(registration.user?.id))
+    );
+    for (const uid of deduped) {
+      Ensure.custom(
+        registeredUserIds.has(Number(uid)),
+        `User ${uid} is not registered for this tournament`
+      );
+    }
+
+    const achievementService = new AchievementService();
+    const userAchievementService = new UserAchievementService();
+    for (const uid of deduped) {
+      const existing = await userAchievementService.findByUserAndAchievement(
+        uid,
+        refreshed!.survivor_achievement_id as number
+      );
+      if (!existing) {
+        await achievementService.assignToUser(
+          refreshed!.survivor_achievement_id as number,
+          uid
+        );
+      }
+    }
+
+    return refreshed;
+  }
+
   async getRegistrations(tournamentId: string | number, page = 1, limit = 50) {
     const tid = typeof tournamentId === "string" ? parseInt(tournamentId, 10) : tournamentId;
     await this.getById(tid);
@@ -653,7 +717,8 @@ export class PubgTournamentService extends RepoService<Tournament> {
 
     const tournament = await tournamentRepo.findOne({ where: { id: tournamentId } });
     Ensure.exists(tournament, "tournament");
-    const autoAchievementXp = autoAchievementXpFromTournament(tournament!);
+    const autoAchievementXp = autoAchievementXpFromTournament(tournament!, 0.2);
+    const survivorAchievementXp = autoAchievementXpFromTournament(tournament!, 10);
 
     let changed = false;
 
@@ -697,6 +762,27 @@ export class PubgTournamentService extends RepoService<Tournament> {
         where: { id: tournament!.audience_achievement_id },
       });
       Ensure.exists(audienceAchievement, "tournament audience achievement");
+    }
+
+    if (!tournament!.survivor_achievement_id) {
+      const achievementService = new AchievementService();
+      const created = (await achievementService.createAchievement({
+        name: SURVIVOR_TEMPLATE.name,
+        description: `وصل إلى قائمة أفضل الناجين في بطولة ${tournament!.title}`,
+        color_theme: SURVIVOR_TEMPLATE.color_theme,
+        icon_url: SURVIVOR_TEMPLATE.icon_url,
+        icon_public_id: SURVIVOR_TEMPLATE.icon_public_id,
+        type: AchievementType.CUSTOM,
+        logic_type: "manual",
+        xp_reward: survivorAchievementXp,
+      })) as Achievement;
+      tournament!.survivor_achievement_id = created.id;
+      changed = true;
+    } else {
+      const survivorAchievement = await achievementRepo.findOne({
+        where: { id: tournament!.survivor_achievement_id },
+      });
+      Ensure.exists(survivorAchievement, "tournament survivor achievement");
     }
 
     if (!tournament!.audience_poll_id) {
@@ -831,9 +917,12 @@ export class PubgTournamentService extends RepoService<Tournament> {
     Ensure.exists(championAchievementId, "champion achievement");
     Ensure.exists(audienceAchievementId, "audience achievement");
 
-    const championWinnerId =
-      manualWinnerIds[0] ?? Number(tournament!.winners?.[0]?.id ?? 0);
-    if (championWinnerId > 0) {
+    const championWinnerIds =
+      manualWinnerIds.length > 0
+        ? manualWinnerIds
+        : (tournament!.winners ?? []).map((winner) => Number(winner.id));
+    for (const championWinnerId of championWinnerIds) {
+      if (!Number.isInteger(championWinnerId) || championWinnerId <= 0) continue;
       const existingChampion = await userAchievementService.findByUserAndAchievement(
         championWinnerId,
         championAchievementId as number

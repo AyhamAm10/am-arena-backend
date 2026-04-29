@@ -26,6 +26,7 @@ pubgTournamentRouter.post(
   pubgTournamentController.registerForTournament
 );
 pubgTournamentRouter.post("/:id/winners", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), pubgTournamentController.assignWinners);
+pubgTournamentRouter.post("/:id/survivors", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), pubgTournamentController.assignSurvivors);
 pubgTournamentRouter.get("/:id/registrations", authMiddleware, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), pubgTournamentController.getRegistrations);
 pubgTournamentRouter.delete("/:id/registrations/:userId", authMiddleware, checkRole([UserRole.SUPER_ADMIN]), pubgTournamentController.removeRegistration);
 pubgTournamentRouter.get("/:id",
