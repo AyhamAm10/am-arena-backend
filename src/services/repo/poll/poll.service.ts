@@ -60,7 +60,7 @@ function normalizeOptionalDate(value: string | null | undefined) {
   return parsed;
 }
 
-function normalizeUserIds(ids: readonly number[]) {
+function normalizeUserIds(ids: readonly (number | undefined)[]) {
   const seen = new Set<number>();
   const result: number[] = [];
   for (const raw of ids) {
@@ -215,9 +215,9 @@ export class PollService extends RepoService<Poll> {
       dtoOptions.map((option) =>
         this.pollOptionRepo.create({
           poll: { id: pollId } as Poll,
-          label: option.type === "text" ? option.label?.trim() ?? "" : option.label?.trim() ?? null,
+          label: option.label?.trim() ?? undefined,
           type: option.type,
-          user: option.user_id ? ({ id: Number(option.user_id) } as User) : null,
+          user: option.user_id ? ({ id: Number(option.user_id) } as User) : undefined,
         }),
       ),
     );
@@ -312,18 +312,6 @@ export class PollService extends RepoService<Poll> {
   private async ensureUserCanVote(poll: Poll, userId: number) {
     Ensure.custom(!isPollClosed(poll), "This poll is closed");
 
-    if (poll.type === "tournament") {
-      Ensure.exists(poll.tournament, "tournament");
-      const registration = await this.registrationRepo.findOne({
-        where: {
-          tournament: { id: poll.tournament!.id },
-          user: { id: userId },
-        } as any,
-      });
-      Ensure.custom(!!registration, "Only tournament participants can vote in this poll");
-      return;
-    }
-
     if (poll.type === "message") {
       Ensure.exists(poll.chat, "chat");
       const membership = await this.chatMemberRepo.findOne({
@@ -362,9 +350,9 @@ export class PollService extends RepoService<Poll> {
         dto.options.map((option) =>
           optionRepo.create({
             poll: { id: poll.id } as Poll,
-            label: option.type === "text" ? option.label?.trim() ?? "" : option.label?.trim() ?? null,
+            label: option.label?.trim() ?? undefined,
             type: option.type,
-            user: option.user_id ? ({ id: Number(option.user_id) } as User) : null,
+            user: option.user_id ? ({ id: Number(option.user_id) } as User) : undefined,
           }),
         ),
       );
@@ -391,11 +379,12 @@ export class PollService extends RepoService<Poll> {
         relations: ["options", "options.user", "tournament", "chat", "message"],
       });
       Ensure.exists(created, "poll");
+      const createdPoll = created as Poll & { options: PollOption[] };
 
       const totalVotes = 0;
       return {
-        ...this.buildPollSummary(created!, totalVotes),
-        options: created!.options.map((option) => ({
+        ...this.buildPollSummary(createdPoll, totalVotes),
+        options: createdPoll.options.map((option) => ({
           id: option.id,
           label: option.label,
           type: option.type,
@@ -437,9 +426,9 @@ export class PollService extends RepoService<Poll> {
     const option = await this.pollOptionRepo.save(
       this.pollOptionRepo.create({
         poll: { id: poll.id } as Poll,
-        label: dto.type === "text" ? dto.label?.trim() ?? "" : dto.label?.trim() ?? null,
+        label: dto.label?.trim() ?? undefined,
         type: dto.type,
-        user: dto.user_id ? ({ id: Number(dto.user_id) } as User) : null,
+        user: dto.user_id ? ({ id: Number(dto.user_id) } as User) : undefined,
       }),
     );
     return {
