@@ -322,13 +322,15 @@ export class PubgTournamentService extends RepoService<Tournament> {
     );
 
     const rows = normalizedRows.map((tournament: Tournament) => {
+      const participantCount = countsByTournamentId.get(tournament.id) ?? 0;
       const result: Record<string, unknown> = {
         ...tournament,
         registration_fields: fieldsByTournamentId.get(tournament.id) ?? [],
         game: mapPubgGameForResponse(
           gamesById.get(Number(tournament.game_ref_id)) ?? null,
         ),
-        registered_count: countsByTournamentId.get(tournament.id) ?? 0,
+        registered_count: participantCount,
+        participant_count: participantCount,
       };
       delete result.winners;
       result.winners = safeTournamentWinnerSummaries(
@@ -388,7 +390,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
     Ensure.exists(game, "pubg game");
 
     let validFriendIds: number[] = [];
-    if (game.type !== PubgType.SOLO) {
+    if (game?.type !== PubgType.SOLO) {
       const friendIds = Array.from(new Set((friends ?? []).filter((id) => id !== userId)));
       if (friendIds.length > 0) {
         const existingFriends = await userService.findManyByCondition({
@@ -492,9 +494,9 @@ export class PubgTournamentService extends RepoService<Tournament> {
         user: { id: userId } as User,
         friends: validFriendIds.map((id) => ({ id }) as User),
         paid: entryFee > 0,
-        payment_method: entryFee > 0 ? "coins" : null,
+        payment_method: entryFee > 0 ? "coins" : undefined,
         registered_at: new Date(),
-      });
+      } as any) as unknown as PubgRegistration;
       await regRepo.save(registration);
 
       const fvRepo = manager.getRepository(PubgRegistrationFieldValue);
@@ -818,8 +820,8 @@ export class PubgTournamentService extends RepoService<Tournament> {
               poll: { id: poll.id } as Poll,
               type: "user",
               user: { id: userId } as User,
-              label: null,
-            })
+              label: undefined,
+            } as any) as unknown as PollOption
           );
         if (options.length > 0) {
           await optionRepo.save(options);
@@ -869,8 +871,8 @@ export class PubgTournamentService extends RepoService<Tournament> {
         poll: { id: refreshed!.audience_poll_id as number } as Poll,
         type: "user",
         user: { id: userId } as User,
-        label: null,
-      })
+        label: undefined,
+      } as any)
     );
   }
 
