@@ -1,6 +1,7 @@
 import { User } from "../entities/User";
 import { Achievement } from "../entities/Achievement";
 import { mediaResponseUrl } from "./media-url";
+import LevelSystemService from "../lib/level-system.service";
 
 type UserLike = Partial<User> & {
   id: number;
@@ -73,6 +74,9 @@ export function serializeUserPublic(user: UserLike) {
     is_active: user.is_active ?? true,
     coins: Number(user.coins ?? 0),
     xp_points: Number(user.xp_points ?? 0),
+    // Level and progress derived from XP using centralized service
+    level: LevelSystemService.getLevelFromXp(Number(user.xp_points ?? 0)),
+    levelProgress: LevelSystemService.getProgressToNextLevel(Number(user.xp_points ?? 0)),
     ...serializeAvatarFields(user),
     selected_achievement: serializeSelectedAchievement(
       user.selected_achievement ?? null

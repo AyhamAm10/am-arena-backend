@@ -31,6 +31,7 @@ import { PollOption } from "../../../entities/PollOption";
 import { Vote } from "../../../entities/Vote";
 import { AchievementService } from "../achievement/achievement.service";
 import { UserAchievementService } from "../user-achievement/user-achievement.service";
+import LevelSystemService from "../../../lib/level-system.service";
 
 type CreatePubgTournamentParams = CreatePubgTournamentDto & {
   createdById: number;
@@ -223,12 +224,21 @@ export class PubgTournamentService extends RepoService<Tournament> {
     const registrationFields = await this.getRegistrationFields(tournament.id);
     const pollService = new PollService();
     const polls = await pollService.getTournamentPolls(tournament.id);
-    return {
+    const result: any = {
       ...tournament,
       game: mapPubgGameForResponse(game),
       registration_fields: registrationFields,
       polls,
     };
+
+    if (tournament.is_super && tournament.description) {
+      const decoded = decodeSuperTournamentDescription(tournament.description);
+      result.description = decoded.description;
+      result.min_xp_required = decoded.min_xp_required;
+      result.required_level = LevelSystemService.getLevelFromXp(Number(decoded.min_xp_required || 0));
+    }
+
+    return result;
   }
 
   async getPubgTournaments(options: GetPubgTournamentsQueryDto) {
@@ -341,6 +351,7 @@ export class PubgTournamentService extends RepoService<Tournament> {
         const decoded = decodeSuperTournamentDescription(tournament.description);
         result.description = decoded.description;
         result.min_xp_required = decoded.min_xp_required;
+        result.required_level = LevelSystemService.getLevelFromXp(Number(decoded.min_xp_required || 0));
       }
 
       return result;

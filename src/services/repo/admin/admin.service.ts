@@ -35,6 +35,7 @@ import {
   decodeSuperTournamentDescription,
   encodeSuperTournamentDescription,
 } from "../../../common/utils/super-tournament-description";
+import LevelSystemService from "../../../lib/level-system.service";
 import { PubgTournamentService } from "../pubg-tournament/pubg-tournament.service";
 
 const SYSTEM_NOTIFICATIONS_CHANNEL = "SYSTEM_NOTIFICATIONS";
@@ -80,8 +81,8 @@ export class AdminService {
     const repo = AppDataSource.getRepository(User);
     const user = await repo.findOneBy({ id: userId });
     Ensure.exists(user, "user");
-    user.is_active = dto.is_active;
-    return repo.save(user);
+    (user as User).is_active = dto.is_active;
+    return repo.save(user as User);
   }
 
   async updateUserBalance(userId: number, dto: UpdateAdminUserBalanceDto) {
@@ -246,14 +247,14 @@ export class AdminService {
     Ensure.exists(channel, "channel");
 
     if (dto.title !== undefined) {
-      channel.title = dto.title;
+      (channel as Chat).title = dto.title;
     }
 
     if (dto.allow_user_messages !== undefined) {
-      channel.allow_user_messages = dto.allow_user_messages;
+      (channel as Chat).allow_user_messages = dto.allow_user_messages;
     }
 
-    await chatRepo.save(channel);
+    await chatRepo.save(channel as Chat);
 
     if (dto.member_ids !== undefined) {
       await chatMemberRepo.delete({ chat: { id: channelId } });
@@ -509,12 +510,16 @@ export class AdminService {
       } as Partial<PubgGame>),
     );
 
+    const minXp = dto.required_level !== undefined
+      ? LevelSystemService.getTotalXpRequiredForLevel(Number(dto.required_level))
+      : Number(dto.min_xp_required ?? 0);
+
     const tournament = await tournamentRepo.save(
       tournamentRepo.create({
         game_type: "super_pubg",
         game_ref_id: game.id,
         title: dto.title,
-        description: encodeSuperTournamentDescription(dto.description, dto.min_xp_required),
+        description: encodeSuperTournamentDescription(dto.description, minXp),
         entry_fee: dto.entry_fee,
         prize_pool: dto.prize_pool,
         max_players: dto.max_players,
@@ -522,7 +527,7 @@ export class AdminService {
         end_date: dto.end_date ? new Date(dto.end_date) : null,
         is_active: dto.is_active ?? true,
         is_super: true,
-        Xp_condition: dto.min_xp_required ?? 0,
+        Xp_condition: minXp,
         created_by: { id: currentUserId } as User,
       }),
     );
@@ -587,12 +592,16 @@ export class AdminService {
     if (dto.end_date !== undefined) tournament.end_date = dto.end_date ? new Date(dto.end_date) : null;
     if (dto.is_active !== undefined) tournament.is_active = dto.is_active;
 
+    const updatedMinXp = dto.required_level !== undefined
+      ? LevelSystemService.getTotalXpRequiredForLevel(Number(dto.required_level))
+      : Number(dto.min_xp_required ?? decoded.min_xp_required ?? 0);
+
     tournament.description = encodeSuperTournamentDescription(
       dto.description ?? decoded.description,
-      dto.min_xp_required ?? decoded.min_xp_required,
+      updatedMinXp,
     );
     tournament.is_super = true;
-    tournament.Xp_condition = dto.min_xp_required ?? decoded.min_xp_required;
+    tournament.Xp_condition = updatedMinXp;
 
     await tournamentRepo.save(tournament);
 
