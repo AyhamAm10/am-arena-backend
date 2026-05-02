@@ -15,6 +15,7 @@ import { swaggerDoc } from "./utils/swaggerOptions";
 import { langMiddleware } from "./middlewares/lang.middleware";
 import "reflect-metadata";
 import { createSuperAdmin } from "./config/createSuperAdmin";
+import { PubgTournamentService } from "./services/repo/pubg-tournament/pubg-tournament.service";
 import authRouter from "./routes/auth.route";
 import pubgTournamentRouter from "./routes/pubg-tournament.route";
 import friendRouter from "./routes/friend.route";
@@ -132,6 +133,7 @@ app.use(process.env.BASE_URL ?? "/", router);
 app.use(errorHandler);
 
 const PORT = Number(process.env.PORT) || 5000;
+const TOURNAMENT_FINALIZATION_SWEEP_MS = 5 * 60 * 1000;
 
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -170,6 +172,13 @@ if (Environment.isDevelopment() || Environment.isProduction()) {
           err: formatErrorForLog(error),
         });
       }
+
+      const pubgTournamentService = new PubgTournamentService();
+      void pubgTournamentService.finalizeExpiredTournaments();
+      const sweepTimer = setInterval(() => {
+        void pubgTournamentService.finalizeExpiredTournaments();
+      }, TOURNAMENT_FINALIZATION_SWEEP_MS);
+      sweepTimer.unref?.();
 
       httpServer.listen(PORT, "0.0.0.0", () => {
         logger.info(`Server running on 0.0.0.0:${PORT}`);

@@ -23,7 +23,7 @@ import { PubgRegistrationFieldValue } from "../../../entities/PubgRegistrationFi
 import { ChatMember } from "../../../entities/ChatMember";
 import { Wallet } from "../../../entities/wallet";
 import { WalletTransaction } from "../../../entities/wallet_transaction";
-import { In } from "typeorm";
+import { In, LessThanOrEqual } from "typeorm";
 import { mapPubgGameForResponse } from "../../../utils/pubg-game-response";
 import { Achievement, AchievementType } from "../../../entities/Achievement";
 import { Poll } from "../../../entities/Poll";
@@ -842,6 +842,24 @@ export class PubgTournamentService extends RepoService<Tournament> {
   async finalizeTournamentIfEnded(tournamentId: number) {
     const tournament = await this.getById(tournamentId) as Tournament;
     await this.finalizeTournamentLifecycleIfNeeded(tournament);
+  }
+
+  async finalizeExpiredTournaments() {
+    const expiredTournaments = await this.repo.find({
+      where: {
+        is_active: true,
+        end_date: LessThanOrEqual(new Date()),
+      } as any,
+      select: ["id"],
+    });
+
+    for (const tournament of expiredTournaments) {
+      try {
+        await this.finalizeTournamentIfEnded(tournament.id);
+      } catch {
+        // Keep sweeping if a single tournament fails.
+      }
+    }
   }
 
   private async ensureParticipantPollOption(tournamentId: number, userId: number) {
